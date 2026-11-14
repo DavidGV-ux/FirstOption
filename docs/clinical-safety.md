@@ -60,6 +60,27 @@ actualmente un nivel 2 o superior: solo medición y estado de registro.
 - Un intervalo de referencia de laboratorio no se tratará como umbral
   operativo de misión.
 
+## Regla de la linterna (inspección pupilar documentada)
+
+La linterna (Incremento 2+) existe para **iluminar durante una
+inspección pupilar** y permitir que la persona registre lo que observa.
+Límites activos:
+
+- La luz **no mide, no analiza y no deriva ningún valor** (pupila,
+  reflejo, tiempo de reacción): no hay procesamiento de imagen y no se
+  capturan fotos, videos ni audio (`recordAudioAndroid: false`,
+  escáner de códigos deshabilitado; la vista de cámara no se muestra).
+- Lo único registrable es la descripción de la persona y una respuesta
+  explícita sobre el síntoma del catálogo v1
+  `symptom_visual_disturbance` (sí/no/no evaluado), guardada como
+  sesión con `source = 'pupil_inspection'`.
+- La inspección **no sustituye una exploración pupilar profesional**;
+  el registro describe, no diagnostica.
+- El LED se apaga al salir de la pantalla y la cámara se desmonta al
+  perder el foco.
+- Las pruebas automatizadas **no activan el flash ni la cámara**; solo
+  verifican la validación y el guardado de la documentación.
+
 ## Escalas propias
 
 Las escalas 1–5 (ánimo, estrés, fatiga, calidad de sueño) son del

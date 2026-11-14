@@ -18,6 +18,7 @@ participantes en entornos análogos (misión análoga, confinamiento, etc.).
 | Historial y último registro con antigüedad | ✅ Implementado |
 | Modo Expo Go (SQLite plano explícito, base separada, banner permanente) | ✅ Implementado; pendiente de verificación en dispositivo |
 | Persistencia tras reinicio | ✅ Verificado con SQLite real en pruebas |
+| Linterna de inspección pupilar (LED iOS/Android, Expo Go incluido) | ✅ Implementado; documentación de lo observado, sin derivar mediciones; pendiente de verificación en dispositivo |
 | Autenticación Supabase (email/contraseña, sesión en SecureStore) | ✅ Implementado, incluido en 36 pruebas unitarias |
 | Sincronización Supabase (outbox transaccional + push idempotente) | ✅ Implementado; **requiere aplicar las migraciones remotas** (`supabase/proposed-migrations/`) |
 | Auto-sync por conectividad/foreground y pull remoto | ⏳ Incremento 2 (continúa) — no implementado |

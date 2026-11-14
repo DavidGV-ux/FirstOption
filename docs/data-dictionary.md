@@ -32,7 +32,7 @@ Una sesión = un registro del participante en un momento.
 | mission_phase | TEXT | `preflight` \| `inflight` \| `postflight` |
 | recorded_at | TEXT | ISO 8601 UTC del guardado |
 | recorded_local_date | TEXT | Fecha local YYYY-MM-DD del guardado |
-| source | TEXT | `manual_entry` (Inc 1) |
+| source | TEXT | `manual_entry` (Inc 1), `pupil_inspection` (linterna, Inc 2+) |
 | note | TEXT NULL | Nota opcional del registro |
 | sync_state | TEXT | `local_only` \| `pending_sync` \| `synced` \| `sync_failed` \| `conflict` |
 | created_at | TEXT | ISO 8601 UTC |

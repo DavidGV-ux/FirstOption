@@ -159,7 +159,7 @@ export default function HomeScreen() {
           <Text style={styles.bodyText}>
             {pending !== null && pending.sessions > 0
               ? `${pending.sessions} registro(s) guardados en este dispositivo, pendientes de sincronizar.`
-              : 'Los registros se guardan cifrados en este dispositivo. La sincronización con el servidor aún no está implementada; este prototipo funciona sin conexión.'}
+              : 'Sin registros pendientes de sincronizar. Los nuevos registros se encolan automáticamente y se envían con "Sincronizar ahora".'}
           </Text>
           {services.remoteConfigured ? (
             authState === 'signed_in' ? (
@@ -223,6 +223,20 @@ export default function HomeScreen() {
         >
           <Text style={styles.linkTitle}>Historial</Text>
           <Text style={styles.bodyText}>Registros guardados en este dispositivo.</Text>
+        </Pressable>
+
+        {/* Linterna de inspección pupilar */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Abrir linterna de inspección pupilar"
+          onPress={() => router.push('/linterna')}
+          style={({ pressed }) => [cardStyle, pressed && styles.pressed]}
+        >
+          <Text style={styles.linkTitle}>Linterna de inspección</Text>
+          <Text style={styles.bodyText}>
+            Luz LED para inspección pupilar y registro de lo observado.
+            La linterna no mide ni deriva valores.
+          </Text>
         </Pressable>
       </ScrollView>
     </>

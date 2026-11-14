@@ -26,4 +26,12 @@ export interface SavedLogSummary {
   savedOffline: true;
 }
 
+/** DTO de entrada de la inspección pupilar documentada (linterna). */
+export interface DocumentInspectionDto {
+  missionPhase: MissionPhase;
+  /** 'si' | 'no' | null (no evaluado). */
+  visualDisturbance: 'si' | 'no' | null;
+  note: string | null;
+}
+
 export type { NewObservationInput };

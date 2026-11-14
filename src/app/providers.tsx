@@ -13,6 +13,7 @@ import {
 } from '@/application/use-cases/register-daily-log';
 import { ListRecentActivityUseCase } from '@/application/use-cases/list-recent-activity';
 import { SyncNowUseCase } from '@/application/use-cases/sync-now';
+import { DocumentPupilInspectionUseCase } from '@/application/use-cases/document-pupil-inspection';
 import { SqliteObservationRepository } from '@/infrastructure/repositories/sqlite-observation-repository';
 import {
   openAppDatabase,
@@ -41,6 +42,7 @@ const EXPO_GO_DATABASE_NAME = 'orbita_salud_local.db';
 
 interface AppServices {
   registerDailyLog: RegisterDailyLogUseCase;
+  documentInspection: DocumentPupilInspectionUseCase;
   listRecentActivity: ListRecentActivityUseCase;
   syncNow: SyncNowUseCase | null;
   supabase: SupabaseClient | null;
@@ -108,6 +110,12 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
           phase: 'ready',
           services: {
             registerDailyLog: new RegisterDailyLogUseCase(repository, identity, clock, ids),
+            documentInspection: new DocumentPupilInspectionUseCase(
+              repository,
+              identity,
+              clock,
+              ids,
+            ),
             listRecentActivity: new ListRecentActivityUseCase(repository, clock),
             syncNow: supabase !== null ? new SyncNowUseCase(supabase, repository) : null,
             supabase,
