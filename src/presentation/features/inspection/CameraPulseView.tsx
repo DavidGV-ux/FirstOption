@@ -38,9 +38,33 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
+  const [pictureSize, setPictureSize] = useState<string | undefined>(undefined);
   const [mountError, setMountError] = useState<string | null>(null);
   const samplesRef = useRef<PpgSample[]>([]);
   const captureFailuresRef = useRef(0);
+
+  const pickSmallestPictureSize = useCallback(async () => {
+    try {
+      const sizes = await cameraRef.current?.getAvailablePictureSizesAsync?.();
+      if (!sizes || sizes.length === 0) return;
+      const parsed = sizes
+        .map((s) => {
+          const m = /^(\d+)x(\d+)$/.exec(s);
+          if (!m) return null;
+          const w = Number(m[1]);
+          const h = Number(m[2]);
+          return { s, pixels: w * h };
+        })
+        .filter((x): x is { s: string; pixels: number } => x !== null)
+        .sort((a, b) => a.pixels - b.pixels);
+      if (parsed.length > 0) {
+        // Elegir una resolución muy baja para capturar/decodificar rápido
+        setPictureSize(parsed[0].s);
+      }
+    } catch {
+      // Si no se puede, usar tamaño por defecto
+    }
+  }, []);
 
   // Muestreo controlado secuencial de luminancia con linterna activa (con reintentos automáticos)
   useEffect(() => {
@@ -49,7 +73,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
     let cancelled = false;
     let timeout: ReturnType<typeof setTimeout> | null = null;
     const startTime = Date.now();
-    const targetDuration = 20000; // 20 segundos por intento para acumular más muestras
+    const targetDuration = 25000; // 25 segundos por intento para acumular más muestras
     samplesRef.current = [];
     captureFailuresRef.current = 0;
 
@@ -114,7 +138,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
       if (cameraRef.current && cameraReady) {
         try {
           const pic = await cameraRef.current.takePictureAsync({
-            quality: 0.05,
+            quality: 0.01,
             base64: true,
             shutterSound: false,
             exif: false,
@@ -247,7 +271,11 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
           facing="back"
           enableTorch={torchEnabled}
           animateShutter={false}
-          onCameraReady={() => setCameraReady(true)}
+          pictureSize={pictureSize}
+          onCameraReady={() => {
+            setCameraReady(true);
+            void pickSmallestPictureSize();
+          }}
           onMountError={(e) => {
             setMountError(
               `No se pudo iniciar la cámara/linterna: ${e.message}. En Expo Go la linterna puede no estar disponible; usa un development build.`,
