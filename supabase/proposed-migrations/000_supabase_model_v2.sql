@@ -535,56 +535,7 @@ for each row
 execute function public.validate_observation();
 
 -- =============================================================
--- 9. ADJUNTOS
--- =============================================================
-
-create table if not exists public.attachments (
-  id uuid primary key default gen_random_uuid(),
-
-  subject_id uuid
-    not null
-    references auth.users (id)
-    on delete cascade,
-
-  observation_id uuid
-    references public.observations (id)
-    on delete set null,
-
-  lab_panel_id uuid
-    references public.lab_panels (id)
-    on delete set null,
-
-  storage_path text not null unique,
-
-  file_name text,
-  mime_type text,
-  file_size_bytes bigint,
-
-  checksum_sha256 text,
-
-  created_at timestamptz
-    not null default now(),
-
-  deleted_at timestamptz,
-
-  constraint attachments_target_required
-    check (
-      observation_id is not null
-      or lab_panel_id is not null
-    )
-);
-
-create index if not exists attachments_subject_idx
-  on public.attachments (subject_id);
-
-create index if not exists attachments_observation_idx
-  on public.attachments (observation_id);
-
-create index if not exists attachments_lab_panel_idx
-  on public.attachments (lab_panel_id);
-
--- =============================================================
--- 10. PANELES DE LABORATORIO
+-- 9. PANELES DE LABORATORIO
 -- =============================================================
 
 create table if not exists public.lab_panels (
@@ -636,6 +587,55 @@ create index if not exists lab_panels_subject_collected_idx
 
 create index if not exists lab_panels_client_request_idx
   on public.lab_panels (client_request_id);
+
+-- =============================================================
+-- 10. ADJUNTOS
+-- =============================================================
+
+create table if not exists public.attachments (
+  id uuid primary key default gen_random_uuid(),
+
+  subject_id uuid
+    not null
+    references auth.users (id)
+    on delete cascade,
+
+  observation_id uuid
+    references public.observations (id)
+    on delete set null,
+
+  lab_panel_id uuid
+    references public.lab_panels (id)
+    on delete set null,
+
+  storage_path text not null unique,
+
+  file_name text,
+  mime_type text,
+  file_size_bytes bigint,
+
+  checksum_sha256 text,
+
+  created_at timestamptz
+    not null default now(),
+
+  deleted_at timestamptz,
+
+  constraint attachments_target_required
+    check (
+      observation_id is not null
+      or lab_panel_id is not null
+    )
+);
+
+create index if not exists attachments_subject_idx
+  on public.attachments (subject_id);
+
+create index if not exists attachments_observation_idx
+  on public.attachments (observation_id);
+
+create index if not exists attachments_lab_panel_idx
+  on public.attachments (lab_panel_id);
 
 -- =============================================================
 -- 11. LÍNEAS BASALES
