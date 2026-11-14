@@ -3,34 +3,14 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { router, Stack, useFocusEffect } from 'expo-router';
 import type { LatestLogStatus } from '@/application/use-cases/list-recent-activity';
 import type { SyncStatus } from '@/application/use-cases/sync-now';
-import { StatusChip } from '@/presentation/components/screen';
+import { StatusBadge, Card, SyncStatusCard, SectionHeader } from '@/presentation/components/ui';
 import { useAppServices } from './_providers';
-import { cardStyle, palette, radius, spacing, typography } from '@/presentation/theme/tokens';
-
-const PHASE_LABELS: Record<string, string> = {
-  preflight: 'Preflight',
-  inflight: 'En vuelo',
-  postflight: 'Postflight',
-};
-
-const SYNC_LABELS: Record<string, string> = {
-  local_only: 'Solo en el dispositivo',
-  pending_sync: 'Pendiente de sincronizar',
-  synced: 'Sincronizado',
-  sync_failed: 'Sincronización fallida (se reintenta)',
-  conflict: 'Conflicto de sincronización',
-};
-
-const SYNC_TONES: Record<string, 'neutral' | 'attention'> = {
-  local_only: 'attention',
-  pending_sync: 'attention',
-  synced: 'neutral',
-  sync_failed: 'attention',
-  conflict: 'attention',
-};
+import { useResponsive } from '@/presentation/hooks/use-responsive';
+import { palette, radius, spacing, typography } from '@/presentation/theme/tokens';
 
 export default function HomeScreen() {
   const services = useAppServices();
+  const r = useResponsive();
   const [status, setStatus] = useState<LatestLogStatus | null>(null);
   const [pending, setPending] = useState<{ sessions: number; observations: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +30,6 @@ export default function HomeScreen() {
     } catch {
       setError('No se pudieron leer los registros locales. Inténtalo de nuevo.');
     }
-    // Estado de sesión remota (sin red: sigue en signed_out pero honesto).
     if (services.supabase !== null) {
       const { data } = await services.supabase.auth.getSession();
       setAuthState(data.session !== null ? 'signed_in' : 'signed_out');
@@ -110,92 +89,21 @@ export default function HomeScreen() {
       <Stack.Screen options={{ title: 'Órbita Salud' }} />
       <ScrollView
         style={styles.flex}
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
-        }
+        contentContainerStyle={[
+          styles.content,
+          { paddingHorizontal: r.horizontalMargin, maxWidth: r.contentMaxWidth, alignSelf: 'center', width: '100%' },
+        ]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        keyboardShouldPersistTaps="handled"
       >
         {error !== null && (
-          <View accessibilityRole="alert" style={styles.errorBox}>
+          <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
 
-        {/* Último registro con antigüedad */}
-        <View style={[cardStyle, styles.section]}>
-          <Text style={styles.sectionTitle}>Último registro</Text>
-          {entry === null ? (
-            <Text style={styles.bodyText}>
-              Aún no hay registros guardados en este dispositivo.
-            </Text>
-          ) : (
-            <View style={styles.gap}>
-              <Text style={styles.bodyText}>{entry.age.label}</Text>
-              {entry.summaryParts.length > 0 ? (
-                <Text style={styles.summaryText}>{entry.summaryParts.join(' · ')}</Text>
-              ) : null}
-              {entry.note !== null ? (
-                <Text style={styles.noteText} numberOfLines={2}>
-                  Nota: {entry.note}
-                </Text>
-              ) : null}
-              <View style={styles.row}>
-                <StatusChip
-                  label={PHASE_LABELS[entry.missionPhase] ?? entry.missionPhase}
-                  tone="neutral"
-                />
-                <StatusChip
-                  label={SYNC_LABELS[entry.syncState] ?? entry.syncState}
-                  tone={SYNC_TONES[entry.syncState] ?? 'attention'}
-                />
-              </View>
-            </View>
-          )}
-        </View>
-
-        {/* Estado de sincronización */}
-        <View style={[cardStyle, styles.section]}>
-          <Text style={styles.sectionTitle}>Sincronización</Text>
-          <Text style={styles.bodyText}>
-            {pending !== null && pending.sessions > 0
-              ? `${pending.sessions} registro(s) guardados en este dispositivo, pendientes de sincronizar.`
-              : 'Sin registros pendientes de sincronizar. Los nuevos registros se encolan automáticamente y se envían con "Sincronizar ahora".'}
-          </Text>
-          {services.remoteConfigured ? (
-            authState === 'signed_in' ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Sincronizar ahora con el servidor"
-                onPress={() => void syncNow()}
-                style={styles.syncButton}
-              >
-                <Text style={styles.syncButtonText}>Sincronizar ahora</Text>
-              </Pressable>
-            ) : (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Iniciar sesión para sincronizar"
-                onPress={() => router.push('/acceso')}
-                style={styles.syncButton}
-              >
-                <Text style={styles.syncButtonText}>Iniciar sesión para sincronizar</Text>
-              </Pressable>
-            )
-          ) : (
-            <Text style={styles.hintText}>
-              Sincronización no configurada en esta compilación.
-            </Text>
-          )}
-          {syncMessage !== null && (
-            <Text style={styles.syncStatusText} accessibilityRole="status">
-              {syncMessage}
-            </Text>
-          )}
-        </View>
-
-        {/* Tareas pendientes: registro de hoy */}
-        <View style={[cardStyle, styles.section]}>
-          <Text style={styles.sectionTitle}>Pendiente</Text>
+        {/* Registro de hoy */}
+        <Card title="Registro de hoy">
           {status !== null && status.isToday ? (
             <Text style={styles.bodyText}>
               Ya existe un registro con fecha de hoy. Puedes registrar otro
@@ -208,50 +116,109 @@ export default function HomeScreen() {
             </Text>
           ) : (
             <Text style={styles.bodyText}>
-              No hay registros: registrar el primer seguimiento es una tarea
-              pendiente.
+              Aún no hay mediciones registradas. Registrar el primer seguimiento
+              es una tarea pendiente.
             </Text>
           )}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Registrar seguimiento"
+            onPress={() => router.push('/registrar')}
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.primaryButtonLabel}>Registrar seguimiento</Text>
+          </Pressable>
+        </Card>
+
+        {/* Última medición */}
+        <Card title="Última medición">
+          {entry !== null ? (
+            <>
+              <Text style={styles.summaryText}>
+                {entry.summaryParts.length > 0
+                  ? entry.summaryParts.join(' · ')
+                  : 'Sin observaciones en esta sesión.'}
+              </Text>
+              <Text style={styles.noteText}>
+                {entry.missionPhase} · {entry.age.label} ·{' '}
+                {entry.syncState === 'local_only' ? 'Solo en dispositivo' : entry.syncState}
+              </Text>
+              {entry.note !== null && (
+                <Text style={styles.noteText} numberOfLines={2}>
+                  {entry.note}
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text style={styles.bodyText}>Aún no hay mediciones registradas.</Text>
+          )}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ver evolución en historial"
+            onPress={() => router.push('/historial')}
+            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.secondaryButtonLabel}>Ver evolución</Text>
+          </Pressable>
+        </Card>
+
+        {/* Actividad reciente */}
+        <Card title="Actividad reciente">
+          {entry !== null ? (
+            <View style={styles.row}>
+              <StatusBadge
+                label={entry.syncState === 'local_only' ? 'Pendiente' : entry.syncState}
+                tone={entry.syncState === 'local_only' ? 'attention' : 'success'}
+              />
+              <Text style={styles.bodyText}>
+                {entry.age.label} · {entry.observationCount} observación(es)
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.bodyText}>Sin actividad reciente.</Text>
+          )}
+        </Card>
+
+        <SyncStatusCard
+          pending={pending?.sessions ?? 0}
+          message={syncMessage}
+          onSync={() => void syncNow()}
+          onSignIn={() => router.push('/acceso')}
+          signedIn={authState === 'signed_in'}
+          configured={services.remoteConfigured}
+        />
+
+        {/* Accesos */}
+        <SectionHeader title="Más" />
+        <View style={[styles.row, { flexWrap: 'wrap' }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Abrir historial"
+            onPress={() => router.push('/historial')}
+            style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
+          >
+            <Text style={styles.linkTitle}>Historial</Text>
+            <Text style={styles.bodyText}>Registros guardados en este dispositivo.</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Abrir análisis descriptivo"
+            onPress={() => router.push('/analisis')}
+            style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
+          >
+            <Text style={styles.linkTitle}>Análisis</Text>
+            <Text style={styles.bodyText}>Resumen estadístico por tiempo real.</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Abrir linterna de inspección"
+            onPress={() => router.push('/linterna')}
+            style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
+          >
+            <Text style={styles.linkTitle}>Linterna</Text>
+            <Text style={styles.bodyText}>Inspección pupilar documentada.</Text>
+          </Pressable>
         </View>
-
-        {/* Acceso al historial */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Abrir historial de registros"
-          onPress={() => router.push('/historial')}
-          style={({ pressed }) => [cardStyle, pressed && styles.pressed]}
-        >
-          <Text style={styles.linkTitle}>Historial</Text>
-          <Text style={styles.bodyText}>Registros guardados en este dispositivo.</Text>
-        </Pressable>
-
-        {/* Linterna de inspección pupilar */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Abrir linterna de inspección pupilar"
-          onPress={() => router.push('/linterna')}
-          style={({ pressed }) => [cardStyle, pressed && styles.pressed]}
-        >
-          <Text style={styles.linkTitle}>Linterna de inspección</Text>
-          <Text style={styles.bodyText}>
-            Luz LED para inspección pupilar y registro de lo observado.
-            La linterna no mide ni deriva valores.
-          </Text>
-        </Pressable>
-
-        {/* Análisis descriptivo */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Abrir análisis descriptivo"
-          onPress={() => router.push('/analisis')}
-          style={({ pressed }) => [cardStyle, pressed && styles.pressed]}
-        >
-          <Text style={styles.linkTitle}>Análisis descriptivo</Text>
-          <Text style={styles.bodyText}>
-            Resumen estadístico de tus registros (BP, FC, SpO₂, Hb) por
-            tiempo real. Sin diagnóstico ni predicción.
-          </Text>
-        </Pressable>
       </ScrollView>
     </>
   );
@@ -259,30 +226,47 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: palette.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md },
-  flex2: { flex: 1 },
-  section: { gap: spacing.xs },
-  sectionTitle: { ...typography.subtitle, color: palette.textPrimary },
+  content: { paddingVertical: spacing.lg, gap: spacing.md },
   bodyText: { ...typography.body, color: palette.textSecondary },
   summaryText: { ...typography.body, color: palette.textPrimary },
   noteText: { ...typography.secondary, color: palette.textSecondary, fontStyle: 'italic' },
-  row: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs, flexWrap: 'wrap' },
-  gap: { gap: spacing.xs },
-  linkTitle: { ...typography.subtitle, color: palette.accent, marginBottom: spacing.xs },
-  pressed: { opacity: 0.8 },
-  ctaSpace: { height: spacing.xl },
-  syncButton: {
-    alignSelf: 'flex-start',
+  row: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+  primaryButton: {
+    minHeight: 48,
     borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: palette.accent,
+    backgroundColor: palette.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     marginTop: spacing.xs,
   },
-  syncButtonText: { ...typography.secondary, color: palette.accent, fontWeight: '600' },
-  syncStatusText: { ...typography.small, color: palette.textSecondary, marginTop: spacing.xs },
-  hintText: { ...typography.small, color: palette.textSecondary, marginTop: spacing.xs },
+  primaryButtonLabel: { ...typography.body, color: palette.accentOnSurface, fontWeight: '600' },
+  secondaryButton: {
+    minHeight: 48,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  secondaryButtonLabel: { ...typography.secondary, color: palette.accent, fontWeight: '600' },
+  linkCard: {
+    flex: 1,
+    minWidth: 150,
+    backgroundColor: palette.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: palette.border,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  linkTitle: { ...typography.cardTitle, color: palette.accent },
+  pressed: { opacity: 0.85 },
   errorBox: {
     backgroundColor: 'rgba(163,52,58,0.08)',
     borderRadius: radius.sm,

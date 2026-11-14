@@ -14,24 +14,27 @@ export const palette = {
   border: '#D8E1E5',
   attention: '#8A5A17',
   priority: '#A3343A',
+  success: '#2F6F4E',
 } as const;
 
 export const spacing = {
   xs: 4,
   sm: 8,
   md: 16,
-  lg: 24,
-  xl: 32,
+  lg: 20,
+  xl: 24,
+  xxl: 32,
 } as const;
 
-export const radius = { sm: 6, md: 10, lg: 14 } as const;
+export const radius = { sm: 12, md: 16, lg: 20 } as const;
 
 export const typography = {
-  title: { fontSize: 22, lineHeight: 28, fontWeight: '600' } satisfies TextStyle,
-  subtitle: { fontSize: 17, lineHeight: 22, fontWeight: '600' } satisfies TextStyle,
-  body: { fontSize: 16, lineHeight: 22 } satisfies TextStyle,
-  secondary: { fontSize: 14, lineHeight: 19 } satisfies TextStyle,
-  small: { fontSize: 13, lineHeight: 17 } satisfies TextStyle,
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '700' } satisfies TextStyle,
+  cardTitle: { fontSize: 18, lineHeight: 24, fontWeight: '600' } satisfies TextStyle,
+  subtitle: { fontSize: 18, lineHeight: 24, fontWeight: '600' } satisfies TextStyle,
+  body: { fontSize: 16, lineHeight: 22, fontWeight: '400' } satisfies TextStyle,
+  secondary: { fontSize: 14, lineHeight: 20, fontWeight: '400' } satisfies TextStyle,
+  small: { fontSize: 12, lineHeight: 16, fontWeight: '600' } satisfies TextStyle,
 } as const;
 
 export const screenStyle: ViewStyle = {
