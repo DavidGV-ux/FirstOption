@@ -35,6 +35,14 @@ class CaptureRepository implements ObservationRepository {
   async listMetricDefinitions(): Promise<never[]> {
     return [];
   }
+
+  async adoptSubjectScope(): Promise<number> {
+    return 0;
+  }
+
+  async countRecordsBySubject(): Promise<number> {
+    return 0;
+  }
 }
 
 const clock: Clock = { nowIso: () => '2026-11-14T12:00:00.000Z' };

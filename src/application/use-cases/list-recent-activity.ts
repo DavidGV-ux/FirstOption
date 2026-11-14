@@ -4,13 +4,16 @@ import type {
   Observation,
   SyncState,
 } from '@/domain/observations/observation';
-import type { ObservationRepository, SessionWithObservations } from '@/domain/repositories/observation-repository';
+import type {
+  ObservationRepository,
+  SessionWithObservations,
+  SubjectIdentityStore,
+} from '@/domain/repositories/observation-repository';
 import type { MetricDefinition } from '@/domain/metrics/metric-definition';
 import type { RelativeAge } from '@/domain/shared/relative-age';
 import { relativeAgeIso } from '@/domain/shared/relative-age';
 import type { Clock } from '@/domain/shared/clock';
 
-/** Fila de resumen para la pantalla de inicio. */
 export interface RecentLogEntry {
   sessionId: string;
   recordedAt: string;
@@ -19,30 +22,28 @@ export interface RecentLogEntry {
   syncState: SyncState;
   note: string | null;
   observationCount: number;
-  /** Resumen legible: p. ej. "Ánimo 3/5, Fatiga 2/5, FC 68 lpm". */
   summaryParts: string[];
 }
 
-/** Estado del último registro para el CTA de inicio. */
 export interface LatestLogStatus {
   entry: RecentLogEntry | null;
-  /** true si el último registro es de hoy (fecha local). */
   isToday: boolean;
 }
 
 export class ListRecentActivityUseCase {
   constructor(
     private readonly repository: ObservationRepository,
+    private readonly identity: SubjectIdentityStore,
     private readonly clock: Clock,
   ) {}
 
   async latestLogStatus(): Promise<LatestLogStatus> {
+    const subjectId = await this.identity.getOrCreateSubjectId();
     const [sessions, definitions] = await Promise.all([
-      this.repository.listRecentSessions(1),
+      this.repository.listRecentSessions(1, subjectId),
       this.repository.listMetricDefinitions(),
     ]);
     if (sessions.length === 0) {
-      // Ausencia de datos NO se presenta como normalidad.
       return { entry: null, isToday: false };
     }
     const entry = toEntry(sessions[0], this.clock.nowIso(), definitions);
@@ -51,22 +52,23 @@ export class ListRecentActivityUseCase {
   }
 
   async listRecent(limit: number): Promise<RecentLogEntry[]> {
+    const subjectId = await this.identity.getOrCreateSubjectId();
     const [sessions, definitions] = await Promise.all([
-      this.repository.listRecentSessions(limit),
+      this.repository.listRecentSessions(limit, subjectId),
       this.repository.listMetricDefinitions(),
     ]);
     return sessions.map((s) => toEntry(s, this.clock.nowIso(), definitions));
   }
 
   async listRecentSessions(limit: number): Promise<SessionWithObservations[]> {
-    return this.repository.listRecentSessions(limit);
+    const subjectId = await this.identity.getOrCreateSubjectId();
+    return this.repository.listRecentSessions(limit, subjectId);
   }
 
-  /** Operaciones aún no sincronizadas; se muestran en la UI, nunca se ocultan. */
   async countPendingSync(): Promise<{ sessions: number; observations: number }> {
-    return this.repository.countPendingSync();
+    const subjectId = await this.identity.getOrCreateSubjectId();
+    return this.repository.countPendingSync(subjectId);
   }
-
 }
 
 export function localDateToday(nowIso: string): string {
@@ -78,31 +80,19 @@ export function localDateToday(nowIso: string): string {
 }
 
 const SUMMARY_METRIC_ORDER = [
-  'mood_self_report',
-  'stress_self_report',
-  'fatigue_self_report',
-  'sleep_quality_self_report',
-  'sleep_duration',
-  'heart_rate',
-  'bp_systolic',
-  'bp_diastolic',
-  'spo2',
+  'mood_self_report', 'stress_self_report', 'fatigue_self_report',
+  'sleep_quality_self_report', 'sleep_duration', 'heart_rate',
+  'bp_systolic', 'bp_diastolic', 'spo2',
 ];
 
-function formatValue(
-  observation: Observation,
-  definitionsById: Map<string, MetricDefinition>,
-): string | null {
+function formatValue(observation: Observation, definitionsById: Map<string, MetricDefinition>): string | null {
   const def = definitionsById.get(observation.metricId);
   if (!def) return null;
   switch (def.valueType) {
-    case 'ordinal_scale':
-      return `${def.nameEs} ${observation.valueOriginal}/5`;
-    case 'boolean':
-      return `${def.nameEs}: presente`;
+    case 'ordinal_scale': return `${def.nameEs} ${observation.valueOriginal}/5`;
+    case 'boolean': return `${def.nameEs}: presente`;
     case 'integer':
-    case 'decimal':
-      return `${def.nameEs} ${formatNumber(observation.valueOriginal)} ${observation.unitOriginal ?? ''}`.trim();
+    case 'decimal': return `${def.nameEs} ${formatNumber(observation.valueOriginal)} ${observation.unitOriginal ?? ''}`.trim();
   }
 }
 
@@ -124,13 +114,8 @@ function toEntry(
     if (ib === -1) return -1;
     return ia - ib;
   });
-  const summaryParts = ordered
-    .map((o) => formatValue(o, definitionsById))
-    .filter((s): s is string => s !== null);
-  // La antigüedad describe la fecha de toma más reciente registrada en
-  // la sesión (no el momento de guardado).
-  const latestObservedAt =
-    ordered.length > 0 ? ordered[ordered.length - 1].observedAt : null;
+  const summaryParts = ordered.map((o) => formatValue(o, definitionsById)).filter((s): s is string => s !== null);
+  const latestObservedAt = ordered.length > 0 ? ordered[ordered.length - 1].observedAt : null;
   const measuredAt = latestObservedAt ?? data.session.recordedAt;
   return {
     sessionId: data.session.sessionId,

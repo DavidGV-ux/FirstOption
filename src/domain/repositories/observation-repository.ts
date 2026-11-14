@@ -24,13 +24,23 @@ export interface ObservationRepository {
   ): Promise<void>;
 
   /** Sesiones recientes con observaciones, más antigua al final. */
-  listRecentSessions(limit: number): Promise<SessionWithObservations[]>;
+  listRecentSessions(limit: number, subjectId?: string): Promise<SessionWithObservations[]>;
 
   /** Cuenta operaciones pendientes de sincronización (aún locales). */
-  countPendingSync(): Promise<{ sessions: number; observations: number }>;
+  countPendingSync(subjectId?: string): Promise<{ sessions: number; observations: number }>;
 
   /** Catálogo de métricas disponible localmente. */
   listMetricDefinitions(): Promise<MetricDefinition[]>;
+
+  /**
+   * Asocia registros creados en el scope local del dispositivo a la
+   * cuenta autenticada (acción explícita del usuario, nunca silenciosa).
+   * Devuelve el número de sesiones adoptadas.
+   */
+  adoptSubjectScope(fromSubjectId: string, toSubjectId: string): Promise<number>;
+
+  /** Cuenta registros (sesiones) por sujeto. */
+  countRecordsBySubject(subjectId: string): Promise<number>;
 }
 
 /** Identidad local del participante (sustituida por auth en Incremento 2). */
@@ -40,6 +50,8 @@ export interface SubjectIdentity {
 
 export interface SubjectIdentityStore {
   getOrCreateSubjectId(): Promise<string>;
+  /** Scope local del dispositivo; null si no hay identidad local. */
+  getLocalDeviceScopeId?(): Promise<string>;
 }
 
 /** Tipo auxiliar para construir observaciones nuevas. */

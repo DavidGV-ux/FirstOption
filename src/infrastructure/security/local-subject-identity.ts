@@ -1,28 +1,19 @@
 import { randomUUID } from 'expo-crypto';
+import type { SubjectIdentityStore } from '@/domain/repositories/observation-repository';
 import type { SqlDriver } from '../database/driver';
 
-/**
- * Identidad del participante.
- *
- * Prioridad:
- * 1. Usuario autenticado en Supabase (auth.uid()) → sus datos remotos
- *    cumplen RLS y FK con auth.users.
- * 2. Identidad local (UUID generado en la primera ejecución) → datos
- *    solo locales. Si luego se sincronizan sin haber iniciado sesión
- *    antes del registro, fallarán la FK remota y quedarán pendientes
- *    con el error visible (nunca se descartan).
- *
- * En el Incremento 1 era solo identidad local; ahora integra auth.
- */
 export interface RemoteSubjectProvider {
   getUserId(): Promise<string | null>;
 }
 
 export interface SubjectIdentityLike {
+  /** Identidad efectiva: cuenta remota si hay sesión, si no el scope local. */
   getOrCreateSubjectId(): Promise<string>;
+  /** Scope local del dispositivo (siempre el UUID local), para adopción. */
+  getLocalDeviceScopeId(): Promise<string>;
 }
 
-export class LocalSubjectIdentity implements SubjectIdentityLike {
+export class LocalSubjectIdentity implements SubjectIdentityLike, SubjectIdentityStore {
   constructor(
     private readonly driver: SqlDriver,
     private readonly remoteSubject: RemoteSubjectProvider | null = null,
@@ -35,6 +26,10 @@ export class LocalSubjectIdentity implements SubjectIdentityLike {
         return remoteId;
       }
     }
+    return this.getLocalDeviceScopeId();
+  }
+
+  async getLocalDeviceScopeId(): Promise<string> {
     const row = await this.driver.getFirst<{ value: string }>(
       "SELECT value FROM schema_meta WHERE key = 'local_subject_id'",
     );

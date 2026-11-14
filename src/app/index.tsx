@@ -18,14 +18,22 @@ export default function HomeScreen() {
   const [authState, setAuthState] = useState<'checking' | 'signed_in' | 'signed_out'>('checking');
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
+  const [accountScope, setAccountScope] = useState<{ subjectId: string; kind: 'remote' | 'device'; email: string | null } | null>(null);
+  const [localCount, setLocalCount] = useState(0);
+  const [adoptMsg, setAdoptMsg] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     try {
-      const [latest, pendingCount] = await Promise.all([
+      const [latest, pendingCount, scope, lc] = await Promise.all([
         services.listRecentActivity.latestLogStatus(),
         services.listRecentActivity.countPendingSync(),
+        services.manageAccount.current(),
+        services.manageAccount.localRecordCount(),
       ]);
       setStatus(latest);
       setPending(pendingCount);
+      setAccountScope(scope);
+      setLocalCount(lc);
       setError(null);
     } catch {
       setError('No se pudieron leer los registros locales. Inténtalo de nuevo.');
@@ -176,6 +184,71 @@ export default function HomeScreen() {
             </View>
           ) : (
             <Text style={styles.bodyText}>Sin actividad reciente.</Text>
+          )}
+        </Card>
+
+        {/* Cuenta y alcance por usuario */}
+        <Card title="Cuenta">
+          <Text style={styles.bodyText}>
+            {accountScope?.kind === 'remote'
+              ? `Sesión iniciada: ${accountScope.email ?? 'cuenta remota'}`
+              : 'Sesión local (sin cuenta). Los registros se asocian a este dispositivo.'}
+          </Text>
+          {authState !== 'signed_in' ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Iniciar sesión o crear cuenta"
+              onPress={() => router.push('/acceso')}
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.secondaryButtonLabel}>Iniciar sesión / crear cuenta</Text>
+            </Pressable>
+          ) : (
+            <>
+              {localCount > 0 && (
+                <>
+                  <Text style={styles.noteText}>
+                    Tienes {localCount} registro(s) del dispositivo sin asociar a
+                    tu cuenta. Puedes asociarlos explícitamente.
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Asociar registros locales a mi cuenta"
+                    onPress={async () => {
+                      try {
+                        const n = await services.manageAccount.adoptLocalRecords();
+                        setAdoptMsg(`Se asociaron ${n} registro(s) a tu cuenta.`);
+                        await load();
+                      } catch (e) {
+                        setAdoptMsg(
+                          e instanceof Error ? e.message : 'No se pudo asociar. Inténtalo de nuevo.',
+                        );
+                      }
+                    }}
+                    style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.secondaryButtonLabel}>Asociar registros locales</Text>
+                  </Pressable>
+                </>
+              )}
+              {adoptMsg !== null && (
+                <Text style={styles.noteText}>{adoptMsg}</Text>
+              )}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar sesión"
+                onPress={async () => {
+                  if (services.supabase !== null) {
+                    await services.supabase.auth.signOut();
+                  }
+                  setAdoptMsg(null);
+                  await load();
+                }}
+                style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.secondaryButtonLabel}>Cerrar sesión</Text>
+              </Pressable>
+            </>
           )}
         </Card>
 

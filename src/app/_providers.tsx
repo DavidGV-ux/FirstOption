@@ -14,6 +14,7 @@ import {
 import { ListRecentActivityUseCase } from '@/application/use-cases/list-recent-activity';
 import { SyncNowUseCase } from '@/application/use-cases/sync-now';
 import { DocumentPupilInspectionUseCase } from '@/application/use-cases/document-pupil-inspection';
+import { ManageAccountScopeUseCase } from '@/application/use-cases/manage-account';
 import { SqliteObservationRepository } from '@/infrastructure/repositories/sqlite-observation-repository';
 import {
   openAppDatabase,
@@ -43,6 +44,7 @@ const EXPO_GO_DATABASE_NAME = 'orbita_salud_local.db';
 interface AppServices {
   registerDailyLog: RegisterDailyLogUseCase;
   documentInspection: DocumentPupilInspectionUseCase;
+  manageAccount: ManageAccountScopeUseCase;
   listRecentActivity: ListRecentActivityUseCase;
   syncNow: SyncNowUseCase | null;
   supabase: SupabaseClient | null;
@@ -96,13 +98,17 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
             supabase = null;
           }
         }
-        const remoteSubject: RemoteSubjectProvider | null =
+        const remoteSubject: (RemoteSubjectProvider & { getEmail(): Promise<string | null> }) | null =
           supabase === null
             ? null
             : {
                 async getUserId() {
                   const { data } = await supabase!.auth.getSession();
                   return data.session?.user?.id ?? null;
+                },
+                async getEmail() {
+                  const { data } = await supabase!.auth.getSession();
+                  return data.session?.user?.email ?? null;
                 },
               };
         const identity = new LocalSubjectIdentity(opened.driver, remoteSubject);
@@ -116,7 +122,12 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
               clock,
               ids,
             ),
-            listRecentActivity: new ListRecentActivityUseCase(repository, clock),
+            manageAccount: new ManageAccountScopeUseCase(
+              identity,
+              repository,
+              remoteSubject,
+            ),
+            listRecentActivity: new ListRecentActivityUseCase(repository, identity, clock),
             syncNow: supabase !== null ? new SyncNowUseCase(supabase, repository) : null,
             supabase,
             remoteConfigured: supabase !== null,

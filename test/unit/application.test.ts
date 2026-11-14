@@ -69,6 +69,21 @@ class InMemoryRepository implements ObservationRepository {
     return { sessions, observations };
   }
 
+  async adoptSubjectScope(fromSubjectId: string, toSubjectId: string): Promise<number> {
+    let n = 0;
+    for (const s of this.sessions) {
+      if (s.subjectId === fromSubjectId) {
+        s.subjectId = toSubjectId;
+        n += 1;
+      }
+    }
+    return n;
+  }
+
+  async countRecordsBySubject(subjectId: string): Promise<number> {
+    return this.sessions.filter((s) => s.subjectId === subjectId).length;
+  }
+
   async listMetricDefinitions(): Promise<MetricDefinition[]> {
     return [...METRIC_CATALOG_V1];
   }
@@ -175,7 +190,7 @@ describe('buildObservations', () => {
 describe('ListRecentActivityUseCase', () => {
   it('con repositorio vacío no afirma normalidad', async () => {
     const repo = new InMemoryRepository();
-    const useCase = new ListRecentActivityUseCase(repo, clock);
+    const useCase = new ListRecentActivityUseCase(repo, { getOrCreateSubjectId: async () => "subject-1" }, clock);
     const status = await useCase.latestLogStatus();
     expect(status.entry).toBeNull();
     expect(status.isToday).toBe(false);
@@ -185,7 +200,7 @@ describe('ListRecentActivityUseCase', () => {
     const repo = new InMemoryRepository();
     const useCase = new RegisterDailyLogUseCase(repo, { getOrCreateSubjectId: async () => 's' }, clock, ids);
     await useCase.execute(validDto);
-    const status = await new ListRecentActivityUseCase(repo, clock).latestLogStatus();
+    const status = await new ListRecentActivityUseCase(repo, { getOrCreateSubjectId: async () => "subject-1" }, clock).latestLogStatus();
     expect(status.entry).not.toBeNull();
     expect(status.isToday).toBe(true);
     expect(status.entry?.age.kind).toBe('hours');
@@ -195,7 +210,7 @@ describe('ListRecentActivityUseCase', () => {
     const repo = new InMemoryRepository();
     const useCase = new RegisterDailyLogUseCase(repo, { getOrCreateSubjectId: async () => 's' }, clock, ids);
     await useCase.execute(validDto);
-    const status = await new ListRecentActivityUseCase(repo, clock).latestLogStatus();
+    const status = await new ListRecentActivityUseCase(repo, { getOrCreateSubjectId: async () => "subject-1" }, clock).latestLogStatus();
     const parts = status.entry?.summaryParts ?? [];
     expect(parts.join(' · ')).toMatch(/Ánimo autorreportado 3\/5/);
     expect(parts.join(' · ')).toMatch(/Duración del sueño 7 h/);

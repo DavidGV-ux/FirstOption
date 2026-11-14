@@ -220,14 +220,22 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
     return `${sessionId}:${obs.metricId}`;
   }
 
-  async listRecentSessions(limit: number): Promise<SessionWithObservations[]> {
+  async listRecentSessions(limit: number, subjectId?: string): Promise<SessionWithObservations[]> {
     const safeLimit = Math.max(1, Math.floor(limit));
-    const sessionRows = await this.driver.getAll<SessionRow>(
-      `SELECT * FROM measurement_sessions
-       ORDER BY recorded_at DESC
-       LIMIT ?`,
-      [safeLimit],
-    );
+    const sessionRows = subjectId === undefined
+      ? await this.driver.getAll<SessionRow>(
+          `SELECT * FROM measurement_sessions
+           ORDER BY recorded_at DESC
+           LIMIT ?`,
+          [safeLimit],
+        )
+      : await this.driver.getAll<SessionRow>(
+          `SELECT * FROM measurement_sessions
+           WHERE subject_id = ?
+           ORDER BY recorded_at DESC
+           LIMIT ?`,
+          [subjectId, safeLimit],
+        );
     if (sessionRows.length === 0) {
       return [];
     }
@@ -251,16 +259,77 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
     }));
   }
 
-  async countPendingSync(): Promise<{ sessions: number; observations: number }> {
+  async countPendingSync(subjectId?: string): Promise<{ sessions: number; observations: number }> {
+    const sessionSql = subjectId === undefined
+      ? `SELECT COUNT(*) AS n FROM measurement_sessions
+         WHERE sync_state IN ('local_only', 'pending_sync', 'sync_failed')`
+      : `SELECT COUNT(*) AS n FROM measurement_sessions
+         WHERE subject_id = ? AND sync_state IN ('local_only', 'pending_sync', 'sync_failed')`;
+    const obsSql = subjectId === undefined
+      ? `SELECT COUNT(*) AS n FROM observations o
+         JOIN measurement_sessions s ON s.session_id = o.session_id
+         WHERE o.sync_state IN ('local_only', 'pending_sync', 'sync_failed')`
+      : `SELECT COUNT(*) AS n FROM observations o
+         JOIN measurement_sessions s ON s.session_id = o.session_id
+         WHERE s.subject_id = ? AND o.sync_state IN ('local_only', 'pending_sync', 'sync_failed')`;
     const sessions = await this.driver.getFirst<{ n: number }>(
-      `SELECT COUNT(*) AS n FROM measurement_sessions
-       WHERE sync_state IN ('local_only', 'pending_sync', 'sync_failed')`,
+      sessionSql,
+      subjectId === undefined ? [] : [subjectId],
     );
     const observations = await this.driver.getFirst<{ n: number }>(
-      `SELECT COUNT(*) AS n FROM observations
-       WHERE sync_state IN ('local_only', 'pending_sync', 'sync_failed')`,
+      obsSql,
+      subjectId === undefined ? [] : [subjectId],
     );
     return { sessions: sessions?.n ?? 0, observations: observations?.n ?? 0 };
+  }
+
+  async adoptSubjectScope(fromSubjectId: string, toSubjectId: string): Promise<number> {
+    if (fromSubjectId === toSubjectId) return 0;
+    // Adoptar sesiones (y sus observaciones siguen enlazadas por session_id).
+    await this.driver.withTransaction(async () => {
+      await this.driver.run(
+        `UPDATE measurement_sessions SET subject_id = ? WHERE subject_id = ?`,
+        [toSubjectId, fromSubjectId],
+      );
+      // Laboratorio (si existe la tabla).
+      try {
+        await this.driver.run(
+          `UPDATE lab_panels SET subject_id = ? WHERE subject_id = ?`,
+          [toSubjectId, fromSubjectId],
+        );
+      } catch {
+        // Tabla puede no existir aún (migración v3 no aplicada): ignorar.
+      }
+      try {
+        await this.driver.run(
+          `UPDATE lab_documents SET subject_id = ? WHERE subject_id = ?`,
+          [toSubjectId, fromSubjectId],
+        );
+      } catch {
+        // Ignorar si la tabla no existe.
+      }
+      try {
+        await this.driver.run(
+          `UPDATE baseline_versions SET subject_id = ? WHERE subject_id = ?`,
+          [toSubjectId, fromSubjectId],
+        );
+      } catch {
+        // Ignorar si la tabla no existe.
+      }
+    });
+    const row = await this.driver.getFirst<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM measurement_sessions WHERE subject_id = ?`,
+      [toSubjectId],
+    );
+    return row?.n ?? 0;
+  }
+
+  async countRecordsBySubject(subjectId: string): Promise<number> {
+    const row = await this.driver.getFirst<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM measurement_sessions WHERE subject_id = ?`,
+      [subjectId],
+    );
+    return row?.n ?? 0;
   }
 
   async listMetricDefinitions(): Promise<MetricDefinition[]> {
