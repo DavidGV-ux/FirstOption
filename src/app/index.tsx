@@ -238,6 +238,20 @@ export default function HomeScreen() {
             La linterna no mide ni deriva valores.
           </Text>
         </Pressable>
+
+        {/* Análisis descriptivo */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Abrir análisis descriptivo"
+          onPress={() => router.push('/analisis')}
+          style={({ pressed }) => [cardStyle, pressed && styles.pressed]}
+        >
+          <Text style={styles.linkTitle}>Análisis descriptivo</Text>
+          <Text style={styles.bodyText}>
+            Resumen estadístico de tus registros (BP, FC, SpO₂, Hb) por
+            tiempo real. Sin diagnóstico ni predicción.
+          </Text>
+        </Pressable>
       </ScrollView>
     </>
   );

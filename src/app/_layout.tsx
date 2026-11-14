@@ -22,6 +22,7 @@ export default function RootLayout() {
         <Stack.Screen name="historial" options={{ title: 'Historial' }} />
         <Stack.Screen name="acceso" options={{ title: 'Acceso' }} />
         <Stack.Screen name="linterna" options={{ title: 'Linterna de inspección' }} />
+        <Stack.Screen name="analisis" options={{ title: 'Análisis descriptivo' }} />
       </Stack>
     </AppServicesProvider>
   );

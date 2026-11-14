@@ -4,7 +4,7 @@ import type {
   Observation,
   SyncState,
 } from '@/domain/observations/observation';
-import type { ObservationRepository } from '@/domain/repositories/observation-repository';
+import type { ObservationRepository, SessionWithObservations } from '@/domain/repositories/observation-repository';
 import type { MetricDefinition } from '@/domain/metrics/metric-definition';
 import type { RelativeAge } from '@/domain/shared/relative-age';
 import { relativeAgeIso } from '@/domain/shared/relative-age';
@@ -58,10 +58,15 @@ export class ListRecentActivityUseCase {
     return sessions.map((s) => toEntry(s, this.clock.nowIso(), definitions));
   }
 
+  async listRecentSessions(limit: number): Promise<SessionWithObservations[]> {
+    return this.repository.listRecentSessions(limit);
+  }
+
   /** Operaciones aún no sincronizadas; se muestran en la UI, nunca se ocultan. */
   async countPendingSync(): Promise<{ sessions: number; observations: number }> {
     return this.repository.countPendingSync();
   }
+
 }
 
 export function localDateToday(nowIso: string): string {
