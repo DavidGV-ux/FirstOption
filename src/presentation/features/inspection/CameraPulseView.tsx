@@ -36,88 +36,113 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
   const samplesRef = useRef<PpgSample[]>([]);
   const captureFailuresRef = useRef(0);
 
-  // Muestreo controlado periódico de luminancia con linterna activa
+  // Muestreo controlado secuencial de luminancia con linterna activa
   useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | null = null;
-    if (measuring) {
-      const startTime = Date.now();
-      const targetDuration = 12000; // 12 segundos de muestreo para estabilidad espectral
-      captureFailuresRef.current = 0;
+    if (!measuring) return;
 
-      timer = setInterval(async () => {
-        const elapsed = Date.now() - startTime;
-        const currentProgress = Math.min(100, Math.round((elapsed / targetDuration) * 100));
-        setProgress(currentProgress);
+    let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const startTime = Date.now();
+    const targetDuration = 15000; // 15 segundos para acumular más muestras
+    captureFailuresRef.current = 0;
 
-        if (cameraRef.current && cameraReady) {
-          try {
-            // Tomamos muestra de baja resolución para muestrear canal rojo/verde
-            const pic = await cameraRef.current.takePictureAsync({
-              quality: 0.2,
-              base64: true,
-              shutterSound: false,
-              skipProcessing: true,
-            });
+    const sampleOnce = async () => {
+      if (cancelled) return;
+      const elapsed = Date.now() - startTime;
+      const currentProgress = Math.min(100, Math.round((elapsed / targetDuration) * 100));
+      setProgress(currentProgress);
 
-            if (pic?.base64) {
-              const decoded = await services.imageEncoder.decodeToRgba(pic.base64);
-              if (decoded.data.length > 0) {
-                // Calcular promedio de R, G, B
-                let rSum = 0;
-                let gSum = 0;
-                let bSum = 0;
-                const total = decoded.width * decoded.height;
-                const step = Math.max(1, Math.floor(total / 500));
-                let count = 0;
+      if (elapsed >= targetDuration) {
+        setMeasuring(false);
+        const count = samplesRef.current.length;
+        if (count < 8) {
+          setErrorMsg(
+            cameraReady
+              ? `Señal insuficiente (${count} muestras válidas). Cubre por completo la cámara trasera y el flash con la yema del dedo, mantén presión suave y evita moverte. Si la linterna no calienta/ilumina el dedo, prueba en un development build.`
+              : 'La cámara no estaba lista para la medición. Espera a que se active y vuelve a intentar.',
+          );
+        } else {
+          // Estimación final con lo obtenido
+          const est = processor.process(samplesRef.current);
+          setCurrentPulse(est);
+          if (est.bpm <= 0 || est.quality === 'unreliable') {
+            setErrorMsg(
+              `Se capturaron ${count} muestras pero el patrón periódico fue débil o poco concluyente. Ajusta la posición del dedo para que el flash ilumine la piel de forma uniforme y repite.`,
+            );
+          } else if (est.quality === 'limited') {
+            setErrorMsg('Señal detectada con calidad limitada. Puedes repetir para mejorar la estimación.');
+          }
+        }
+        return;
+      }
 
-                for (let i = 0; i < total; i += step) {
-                  const off = i * 4;
-                  rSum += decoded.data[off];
-                  gSum += decoded.data[off + 1];
-                  bSum += decoded.data[off + 2];
-                  count++;
-                }
+      if (cameraRef.current && cameraReady) {
+        try {
+          const pic = await cameraRef.current.takePictureAsync({
+            quality: 0.25,
+            base64: true,
+            shutterSound: false,
+            exif: false,
+          });
 
-                if (count > 0) {
-                  const sample: PpgSample = {
-                    timestampMs: Date.now(),
-                    red: rSum / count,
-                    green: gSum / count,
-                    blue: bSum / count,
-                  };
+          if (pic?.base64) {
+            const decoded = await services.imageEncoder.decodeToRgba(pic.base64);
+            if (decoded.data.length > 0 && decoded.width > 0 && decoded.height > 0) {
+              let rSum = 0;
+              let gSum = 0;
+              let bSum = 0;
+              const total = decoded.width * decoded.height;
+              const step = Math.max(1, Math.floor(total / 600));
+              let pxCount = 0;
 
-                  setFingerDetected(processor.isFingerDetected(sample));
-                  samplesRef.current = [...samplesRef.current, sample];
-                  if (samplesRef.current.length >= 6) {
-                    const est = processor.process(samplesRef.current);
-                    setCurrentPulse(est);
-                  }
+              for (let i = 0; i < total; i += step) {
+                const off = i * 4;
+                rSum += decoded.data[off];
+                gSum += decoded.data[off + 1];
+                bSum += decoded.data[off + 2];
+                pxCount++;
+              }
+
+              if (pxCount > 0) {
+                const sample: PpgSample = {
+                  timestampMs: Date.now(),
+                  red: rSum / pxCount,
+                  green: gSum / pxCount,
+                  blue: bSum / pxCount,
+                };
+
+                setFingerDetected(processor.isFingerDetected(sample));
+                samplesRef.current = [...samplesRef.current, sample];
+                if (samplesRef.current.length >= 6) {
+                  const est = processor.process(samplesRef.current);
+                  setCurrentPulse(est);
                 }
               }
             } else {
               captureFailuresRef.current += 1;
             }
-          } catch {
+          } else {
             captureFailuresRef.current += 1;
           }
+        } catch {
+          captureFailuresRef.current += 1;
         }
+      }
 
-        if (elapsed >= targetDuration) {
-          setMeasuring(false);
-          if (timer) clearInterval(timer);
-          if (samplesRef.current.length < 6) {
-            setErrorMsg(
-              cameraReady
-                ? 'No se pudo obtener una señal suficiente. Cubre completamente la cámara trasera y la linterna con el dedo, mantén presión suave y evita moverte. En Expo Go la linterna/captura puede ser limitada; prueba con un development build si persiste.'
-                : 'La cámara no estaba lista para la medición. Espera a que se active y vuelve a intentar.',
-            );
-          }
-        }
-      }, 500);
-    }
+      if (!cancelled) {
+        timeout = setTimeout(() => {
+          void sampleOnce();
+        }, 350);
+      }
+    };
+
+    timeout = setTimeout(() => {
+      void sampleOnce();
+    }, 400);
 
     return () => {
-      if (timer) clearInterval(timer);
+      cancelled = true;
+      if (timeout) clearTimeout(timeout);
     };
   }, [measuring, processor, services.imageEncoder, cameraReady]);
 
@@ -245,17 +270,21 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
       )}
 
       {/* Resultados de la estimación */}
-      {currentPulse && currentPulse.bpm > 0 && (
+      {currentPulse && currentPulse.sampleCount >= 6 && (
         <View style={[cardStyle, styles.vitalsCard]}>
           <Text style={styles.cardHeader}>Signos vitales aproximados (PPG con linterna)</Text>
 
           <View style={styles.mainBpmRow}>
             <View>
-              <Text style={styles.bpmNumber}>{currentPulse.bpm}</Text>
+              <Text style={styles.bpmNumber}>
+                {currentPulse.bpm > 0 ? Math.round(currentPulse.bpm) : '--'}
+              </Text>
               <Text style={styles.bpmUnit}>latidos por minuto (FC)</Text>
             </View>
             <View style={styles.sqiBadge}>
-              <Text style={styles.sqiText}>Calidad (SQI): {Math.round(currentPulse.sqi * 100)}%</Text>
+              <Text style={styles.sqiText}>
+                Calidad: {currentPulse.quality} · SQI {Math.round(currentPulse.sqi * 100)}%
+              </Text>
             </View>
           </View>
 
