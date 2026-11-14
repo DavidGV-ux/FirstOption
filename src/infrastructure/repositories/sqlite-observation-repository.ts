@@ -11,7 +11,6 @@ import type {
   SessionWithObservations,
 } from '@/domain/repositories/observation-repository';
 import type { OutboxRow, SyncOutboxStore } from '@/domain/repositories/sync-outbox';
-import type { LabRepository, SaveLabPanelInput, SaveLabPanelResult } from '@/domain/repositories/lab-repository';
 import type { MetricDefinition } from '@/domain/metrics/metric-definition';
 import type { SqlDriver } from '../database/driver';
 
@@ -113,7 +112,7 @@ function mapMetric(row: MetricRow): MetricDefinition {
  * `sync_outbox` en la MISMA transacción (offline-first): guardar una
  * medición y encolarla para sincronizar es una única operación atómica.
  */
-export class SqliteObservationRepository implements ObservationRepository, SyncOutboxStore, LabRepository {
+export class SqliteObservationRepository implements ObservationRepository, SyncOutboxStore {
   constructor(private readonly driver: SqlDriver) {}
 
   async saveSessionWithObservations(

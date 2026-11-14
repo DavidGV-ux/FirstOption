@@ -13,7 +13,7 @@ export interface SaveLabPanelResult {
 
 export interface SaveLabPanelInput {
   panel: LabPanel;
-  results: Array<{
+  results: {
     metricId: string;
     valueOriginal: number;
     unitOriginal: string;
@@ -22,7 +22,7 @@ export interface SaveLabPanelInput {
     conversionId: string | null;
     conversionVersion: number | null;
     qualityState: string;
-  }>;
+  }[];
   documents: PrivateDocument[];
 }
 

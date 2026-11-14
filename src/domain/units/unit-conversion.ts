@@ -250,14 +250,14 @@ export function latestConversionFor(metricId: string, fromUnit: string): Convers
  */
 export function listUnitsForMetric(
   metricId: string,
-): Array<{ unit: string; label: string; canonical: boolean; conversionId?: string }> {
+): { unit: string; label: string; canonical: boolean; conversionId?: string }[] {
   const def = getMetricDefinition(metricId);
-  const units: Array<{
+  const units: {
     unit: string;
     label: string;
     canonical: boolean;
     conversionId?: string;
-  }> = [];
+  }[] = [];
   if (def?.canonicalUnit != null) {
     units.push({ unit: def.canonicalUnit, label: def.canonicalUnit, canonical: true });
   }

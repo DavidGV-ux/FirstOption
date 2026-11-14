@@ -1,4 +1,4 @@
-import { Crypto } from 'expo-crypto';
+import { randomUUID } from 'expo-crypto';
 import { Directory, File, Paths } from 'expo-file-system';
 import type { PrivateDocument, PrivateDocumentStore, PickedPrivateDocument } from '@/domain/labs/lab-panel';
 
@@ -43,10 +43,14 @@ export class ExpoPrivateDocumentStore implements PrivateDocumentStore {
   }
 
   async persist(subjectId: string, picked: PickedPrivateDocument): Promise<PrivateDocument> {
-    const documentId = `doc-${Crypto.randomUUID()}`;
+    const documentId = `doc-${randomUUID()}`;
     const source = new File(picked.uri);
     const dir = new Directory(Paths.document, 'private-documents', subjectId);
-    await dir.create({ idempotent: true }).catch(() => undefined);
+    try {
+      await dir.create({ idempotent: true });
+    } catch {
+      // El directorio ya existe o no se pudo crear; seguimos.
+    }
     const destination = new File(dir, `${documentId}_${picked.fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`);
     if (destination.exists) {
       destination.delete();
