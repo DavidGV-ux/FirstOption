@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Stack, useFocusEffect } from 'expo-router';
-import { useCameraPermissions } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import type { MissionPhase } from '@/domain/observations/observation';
 import {
   MISSION_PHASES,
@@ -407,6 +407,14 @@ export default function LinternaScreen() {
                   El LED funciona únicamente como iluminación de inspección; no realiza
                   mediciones clínicas.
                 </Text>
+                {focused && permission?.granted ? (
+                  <CameraView
+                    style={styles.hiddenTorchCamera}
+                    facing="back"
+                    enableTorch={torchOn}
+                    animateShutter={false}
+                  />
+                ) : null}
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={torchOn ? 'Apagar la linterna' : 'Encender la linterna'}
@@ -423,7 +431,7 @@ export default function LinternaScreen() {
                   </Text>
                 </Pressable>
                 <Text style={styles.hintText}>
-                  La linterna se apaga automáticamente al salir de esta pantalla.
+                  La linterna se apaga automáticamente al salir de esta pantalla. Requiere cámara trasera activa; en Expo Go puede no estar disponible.
                 </Text>
               </View>
             )}
@@ -759,5 +767,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   hintText: { ...typography.small, color: palette.textSecondary, marginTop: spacing.xs },
+  hiddenTorchCamera: {
+    width: 1,
+    height: 1,
+    opacity: 0.01,
+  },
   pressed: { opacity: 0.8 },
 });

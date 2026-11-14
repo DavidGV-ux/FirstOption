@@ -31,7 +31,10 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
   const [savedSuccess, setSavedSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [mountError, setMountError] = useState<string | null>(null);
   const samplesRef = useRef<PpgSample[]>([]);
+  const captureFailuresRef = useRef(0);
 
   // Muestreo controlado periódico de luminancia con linterna activa
   useEffect(() => {
@@ -39,22 +42,24 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
     if (measuring) {
       const startTime = Date.now();
       const targetDuration = 12000; // 12 segundos de muestreo para estabilidad espectral
+      captureFailuresRef.current = 0;
 
       timer = setInterval(async () => {
         const elapsed = Date.now() - startTime;
         const currentProgress = Math.min(100, Math.round((elapsed / targetDuration) * 100));
         setProgress(currentProgress);
 
-        if (cameraRef.current) {
+        if (cameraRef.current && cameraReady) {
           try {
-            // Tomamos muestra muy rápida en baja resolución para muestrear canal rojo/verde
+            // Tomamos muestra de baja resolución para muestrear canal rojo/verde
             const pic = await cameraRef.current.takePictureAsync({
-              quality: 0.1,
+              quality: 0.2,
               base64: true,
               shutterSound: false,
+              skipProcessing: true,
             });
 
-            if (pic && pic.base64) {
+            if (pic?.base64) {
               const decoded = await services.imageEncoder.decodeToRgba(pic.base64);
               if (decoded.data.length > 0) {
                 // Calcular promedio de R, G, B
@@ -73,53 +78,62 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
                   count++;
                 }
 
-                const rMean = rSum / count;
-                const gMean = gSum / count;
-                const bMean = bSum / count;
+                if (count > 0) {
+                  const sample: PpgSample = {
+                    timestampMs: Date.now(),
+                    red: rSum / count,
+                    green: gSum / count,
+                    blue: bSum / count,
+                  };
 
-                const sample: PpgSample = {
-                  timestampMs: Date.now(),
-                  red: rMean,
-                  green: gMean,
-                  blue: bMean,
-                };
-
-                const isFinger = processor.isFingerDetected(sample);
-                setFingerDetected(isFinger);
-
-                samplesRef.current = [...samplesRef.current, sample];
-                // Si tenemos suficientes muestras, calcular estimación en tiempo real
-                if (samplesRef.current.length >= 6) {
-                  const est = processor.process(samplesRef.current);
-                  setCurrentPulse(est);
+                  setFingerDetected(processor.isFingerDetected(sample));
+                  samplesRef.current = [...samplesRef.current, sample];
+                  if (samplesRef.current.length >= 6) {
+                    const est = processor.process(samplesRef.current);
+                    setCurrentPulse(est);
+                  }
                 }
               }
+            } else {
+              captureFailuresRef.current += 1;
             }
           } catch {
-            // Continúa muestreando
+            captureFailuresRef.current += 1;
           }
         }
 
         if (elapsed >= targetDuration) {
           setMeasuring(false);
           if (timer) clearInterval(timer);
+          if (samplesRef.current.length < 6) {
+            setErrorMsg(
+              cameraReady
+                ? 'No se pudo obtener una señal suficiente. Cubre completamente la cámara trasera y la linterna con el dedo, mantén presión suave y evita moverte. En Expo Go la linterna/captura puede ser limitada; prueba con un development build si persiste.'
+                : 'La cámara no estaba lista para la medición. Espera a que se active y vuelve a intentar.',
+            );
+          }
         }
-      }, 400);
+      }, 500);
     }
 
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [measuring, processor, services.imageEncoder]);
+  }, [measuring, processor, services.imageEncoder, cameraReady]);
 
   const startMeasurement = useCallback(() => {
+    if (!cameraReady) {
+      setErrorMsg('Esperando a que la cámara y la linterna estén listas…');
+      return;
+    }
     samplesRef.current = [];
     setProgress(0);
     setCurrentPulse(null);
     setSavedSuccess(null);
     setErrorMsg(null);
+    setFingerDetected(false);
     setMeasuring(true);
-  }, []);
+  }, [cameraReady]);
 
   const handleSaveObservations = async () => {
     if (!currentPulse) return;
@@ -164,8 +178,14 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
           ref={cameraRef}
           style={styles.camera}
           facing="back"
-          enableTorch={true}
+          enableTorch
           animateShutter={false}
+          onCameraReady={() => setCameraReady(true)}
+          onMountError={(e) => {
+            setMountError(
+              `No se pudo iniciar la cámara/linterna: ${e.message}. En Expo Go la linterna puede no estar disponible; usa un development build.`,
+            );
+          }}
         />
 
         <View style={styles.overlay}>
@@ -174,9 +194,11 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
               {fingerDetected ? '✓ Dedo detectado' : '👆 Cubre la cámara y la linterna con la yema del dedo'}
             </Text>
             <Text style={styles.fingerHintSub}>
-              {fingerDetected
-                ? 'Mantén el dedo apoyado con presión suave y sin moverte.'
-                : 'La linterna iluminará el lecho capilar para registrar las pulsaciones ópticas.'}
+              {!cameraReady
+                ? 'Preparando cámara y linterna…'
+                : fingerDetected
+                  ? 'Mantén el dedo apoyado con presión suave y sin moverte.'
+                  : 'La linterna iluminará el lecho capilar para registrar las pulsaciones ópticas.'}
             </Text>
           </View>
 
@@ -191,16 +213,28 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
         </View>
       </View>
 
+      {mountError ? <Text style={styles.errorText}>{mountError}</Text> : null}
+      {errorMsg && !mountError ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+
       {/* Botón para iniciar / reiniciar medición */}
       {!measuring ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Iniciar medición de pulso con linterna"
           onPress={startMeasurement}
-          style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
+          disabled={!cameraReady}
+          style={({ pressed }) => [
+            styles.actionButton,
+            (!cameraReady || pressed) && styles.pressed,
+            !cameraReady && styles.btnDisabled,
+          ]}
         >
           <Text style={styles.actionButtonText}>
-            {currentPulse ? '⚡ Repetir medición de pulso' : '⚡ Iniciar medición con linterna (PPG)'}
+            {!cameraReady
+              ? 'Preparando cámara…'
+              : currentPulse
+                ? '⚡ Repetir medición de pulso'
+                : '⚡ Iniciar medición con linterna (PPG)'}
           </Text>
         </Pressable>
       ) : (
