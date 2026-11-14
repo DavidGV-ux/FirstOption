@@ -66,6 +66,9 @@ class NodeSqlDriver {
 const { MIGRATION_V1_STATEMENTS, MIGRATION_V1_CATALOG_SQL } = await import(
   '../../src/infrastructure/database/migrations/v001-initial.ts'
 );
+const { MIGRATION_V6_STATEMENTS } = await import(
+  '../../src/infrastructure/database/migrations/v006-camera-inspection.ts'
+);
 const { METRIC_CATALOG_V1, METRIC_CATALOG_VERSION } = await import(
   '../../src/domain/metrics/catalog-v1.ts'
 );
@@ -278,4 +281,86 @@ test('estado de sincronización local_only no se cuenta como sincronizado', asyn
      WHERE sync_state IN ('local_only','pending_sync','sync_failed')`,
   );
   assert.equal(pending?.n, 1);
+});
+
+test('migración v6: crea las tablas de inspección asistida por cámara e integridad referencial en cascada', async () => {
+  await applyMigrations(driver);
+  for (const sql of MIGRATION_V6_STATEMENTS) {
+    await driver.exec(sql);
+  }
+
+  // Verificar que las tablas existen
+  const tables = await driver.getAll<{ name: string }>(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name IN (
+      'camera_inspection_sessions', 'camera_captures', 'capture_quality_metrics',
+      'pupil_estimates', 'inspection_comparisons'
+    ) ORDER BY name ASC`,
+  );
+  assert.equal(tables.length, 5);
+
+  // Insertar sesión de inspección
+  await driver.run(
+    `INSERT INTO camera_inspection_sessions (
+      session_id, subject_id, mission_phase, started_at, ended_at,
+      device_model, os_version, app_version, camera_facing, sync_state, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      'cis-1', 'subj-test', 'inflight', '2026-11-14T12:00:00Z', '2026-11-14T12:05:00Z',
+      'Test Phone', 'iOS 18.0', '1.0.0', 'front', 'local_only', '2026-11-14T12:00:00Z'
+    ],
+  );
+
+  // Insertar captura
+  await driver.run(
+    `INSERT INTO camera_captures (
+      capture_id, session_id, captured_at, eye_side, capture_mode,
+      lighting_condition, approximate_distance, image_saved,
+      image_storage_path, image_sha256, quality_status, quality_notes, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      'cap-1', 'cis-1', '2026-11-14T12:01:00Z', 'left', 'front_camera',
+      'adequate', 'medium', 0, null, null, 'good', 'Nota de prueba', '2026-11-14T12:01:00Z'
+    ],
+  );
+
+  // Insertar métricas de calidad y estimación
+  await driver.run(
+    `INSERT INTO capture_quality_metrics (
+      capture_id, brightness, contrast, sharpness, motion_score,
+      blink_detected, eye_open, eye_in_guide, lighting_score,
+      resolution_width, resolution_height, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['cap-1', 110.5, 42.0, 18.5, 0.12, 0, 1, 1, 0.9, 640, 480, '2026-11-14T12:01:00Z'],
+  );
+
+  await driver.run(
+    `INSERT INTO pupil_estimates (
+      estimate_id, capture_id, method_code, method_version,
+      relative_scale, confidence, quality_status, limitations, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['est-1', 'cap-1', 'EXPERIMENTAL_RATIO_V1', '1.0.0', 0.42, 0.85, 'good', '[]', '2026-11-14T12:01:00Z'],
+  );
+
+  // Comprobar que los registros se leen correctamente
+  const captureRow = await driver.getFirst<{ capture_id: string; quality_status: string }>(
+    'SELECT capture_id, quality_status FROM camera_captures WHERE capture_id = ?',
+    ['cap-1'],
+  );
+  assert.equal(captureRow?.capture_id, 'cap-1');
+  assert.equal(captureRow?.quality_status, 'good');
+
+  // Integridad referencial: al eliminar la sesión se eliminan en cascada la captura y métricas
+  await driver.run('DELETE FROM camera_inspection_sessions WHERE session_id = ?', ['cis-1']);
+
+  const remainingCapture = await driver.getFirst<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM camera_captures WHERE capture_id = ?',
+    ['cap-1'],
+  );
+  assert.equal(remainingCapture?.n, 0);
+
+  const remainingMetrics = await driver.getFirst<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM capture_quality_metrics WHERE capture_id = ?',
+    ['cap-1'],
+  );
+  assert.equal(remainingMetrics?.n, 0);
 });

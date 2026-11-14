@@ -8,13 +8,13 @@ participantes en entornos análogos (misión análoga, confinamiento, etc.).
 > y no infiere mediciones. Registra, describe y —en incrementos
 > posteriores— proyecta con métodos explícitos y reproducibles.
 
-## Estado actual (Incrementos 1–4 en el código)
+## Estado actual (Incrementos 1–4 + trabajo en curso de inspección por cámara)
 
 | Capacidad | Estado |
 |---|---|
 | Registro manual diario (ánimo, estrés, fatiga, sueño, síntomas, FC, PA, SpO₂, nota) | ✅ Implementado, con pruebas unitarias |
 | Validación de entrada con reglas puras (Zod + reglas de dominio) | ✅ Implementado |
-| SQLite cifrado (SQLCipher) con migraciones versionadas (v1–v5) | ✅ Implementado, 7 pruebas de integración sobre SQLite real |
+| SQLite cifrado (SQLCipher) con migraciones versionadas (v1–v6) | ✅ Implementado, 8 pruebas de integración sobre SQLite real |
 | Historial y último registro con antigüedad | ✅ Implementado |
 | Persistencia tras reinicio | ✅ Verificado con SQLite real en pruebas |
 | Modo Expo Go (SQLite plano explícito, base separada, banner permanente) | ✅ Implementado; pendiente de verificación en dispositivo |
@@ -28,10 +28,11 @@ participantes en entornos análogos (misión análoga, confinamiento, etc.).
 | Elegibilidad analítica (datos insuficientes, no comparable, calidad, duplicados, cambio de método) | ✅ Implementado |
 | Descripción estadística y tendencias por tiempo real (método versionado, n visible, unidades) | ✅ Implementado (`/analisis`) |
 | Ejecuciones de análisis reproducibles (`analysis_runs` + observaciones de entrada) | ✅ Implementado |
-| Línea de linterna para documentar inspección pupilar (sin derivar mediciones) | ✅ Implementado (`/linterna`); pendiente de verificación en dispositivo |
+| Inspección asistida por cámara (captura guiada, calidad de señal, estimación pupilar relativa experimental, comparación y registro de inspección) | 🚧 En desarrollo (`/linterna`): flujo y persistencia local en progreso; aproximaciones experimentales, **no** mediciones clínicas ni diagnóstico |
+| Estimación óptica de pulso con linterna (PPG) y derivación experimental de signos vitales | 🚧 Experimental (`/linterna`): señal/estimaciones aproximadas con calidad y limitaciones; **no** sustituye medición clínica ni diagnóstico |
 | Pronóstico de referencia y proyección experimental con intervalo de predicción real | ⏳ Pendiente (Incremento 5) |
 | Protocolos versionados, eventos de revisión y exportación | ⏳ Pendiente (Incremento 6) |
-| Voz y pupila automatizadas | ⏳ Fuera de alcance por ahora: sin feature flags ni modelos validados; la app no simula mediciones |
+| Voz y pupila automatizadas validadas | ⏳ Fuera de alcance por ahora: sin modelos/feature flags validados; la app no simula mediciones ni conclusiones clínicas |
 | Datos demo sintéticos con banner permanente | ⏳ Pendiente |
 | Ejecución verificada en dispositivo iOS/Android | ⏳ Pendiente: requiere development build con SQLCipher |
 
@@ -53,9 +54,9 @@ Detalle del avance en [`PROGRESO.md`](PROGRESO.md).
 - React Hook Form + Zod.
 - Sistema de diseño responsivo (1 columna en móvil, 2 en tablet) con
   tokens de color verificados y foco en accesibilidad.
-- Pruebas: Jest (52 unitarias: dominio, aplicación, sincronización,
-  analítica) + SQLite real con `node:sqlite` (7 de integración:
-  migraciones, persistencia, integridad, outbox).
+- Pruebas: Jest (64 unitarias: dominio, aplicación, sincronización,
+  analítica, inspección por cámara) + SQLite real con `node:sqlite` (8 de
+  integración: migraciones, persistencia, integridad, outbox, cámara).
 
 ## Requisitos
 
@@ -132,11 +133,10 @@ continuación del Incremento 2.
 ```bash
 npm install
 npx tsc --noEmit          # verificación de tipos: OK
-npx jest                  # 52 pruebas unitarias: OK
-npm run test:integration  # 7 pruebas de integración con SQLite real: OK
+npx jest                  # 64 pruebas unitarias: OK
+npm run test:integration  # 8 pruebas de integración con SQLite real: OK
 npx expo lint             # sin problemas
-npx expo-doctor           # 20/20 comprobaciones OK
-npx expo export --platform ios --platform android   # bundles iOS y Android: OK
+npx expo-doctor           # 20/20 comprobaciones OK (última ejecución registrada)
 
 # Ejecutar en dispositivo (requiere build nativo con SQLCipher):
 npx expo run:android      # o: npx expo run:ios
@@ -153,7 +153,7 @@ npx expo run:android      # o: npx expo run:ios
 | `/basales` | Líneas basales versionadas |
 | `/analisis` | Elegibilidad, descripción y tendencias |
 | `/acceso` | Acceso con email y contraseña (Supabase Auth) |
-| `/linterna` | Documentar inspección pupilar con linterna (sin derivar mediciones) |
+| `/linterna` | Inspección asistida por cámara (pupila/pulso óptico experimental) y linterna de apoyo; aproximaciones con calidad/limitaciones, sin diagnóstico |
 
 ## Documentación
 

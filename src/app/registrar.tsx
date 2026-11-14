@@ -5,7 +5,7 @@ import DateTimePicker, {
   DateTimePickerAndroid,
 } from '@react-native-community/datetimepicker';
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { dailyLogInputSchema, type DailyLogInput } from '@/domain/observations/daily-log-schema';
 import { ValidationError } from '@/domain/observations/daily-log-schema';
 import { MISSION_PHASES, MISSION_PHASE_LABELS_ES } from '@/domain/observations/observation';
@@ -28,6 +28,13 @@ type FormValues = DailyLogInput;
  */
 export default function RegisterScreen() {
   const services = useAppServices();
+  const params = useLocalSearchParams<{
+    estHeartRate?: string;
+    estBpSystolic?: string;
+    estBpDiastolic?: string;
+    estSpo2?: string;
+  }>();
+
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
 
@@ -46,10 +53,10 @@ export default function RegisterScreen() {
       fatigue: null,
       sleepQuality: null,
       sleepHours: null,
-      heartRate: null,
-      bpSystolic: null,
-      bpDiastolic: null,
-      spo2: null,
+      heartRate: params.estHeartRate ? Number(params.estHeartRate) : null,
+      bpSystolic: params.estBpSystolic ? Number(params.estBpSystolic) : null,
+      bpDiastolic: params.estBpDiastolic ? Number(params.estBpDiastolic) : null,
+      spo2: params.estSpo2 ? Number(params.estSpo2) : null,
       symptoms: {},
       note: null,
     },
@@ -254,9 +261,20 @@ export default function RegisterScreen() {
         <View style={[cardStyle, styles.gap]}>
           <Text style={styles.sectionTitle}>Signos vitales (opcional)</Text>
           <Text style={styles.helper}>
-            Solo si mediste estos valores con un dispositivo. No se infieren
+            Solo si mediste estos valores con un dispositivo o con la linterna. No se infieren
             valores faltantes.
           </Text>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Medir pulso y estimar signos vitales con linterna"
+            onPress={() => router.push('/linterna')}
+            style={({ pressed }) => [styles.estimateButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.estimateButtonText}>
+              ⚡ Medir pulso y estimar vitales con linterna (PPG)
+            </Text>
+          </Pressable>
           <Controller
             control={control}
             name="heartRate"
@@ -533,6 +551,25 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   dateText: { ...typography.body, color: palette.textPrimary },
+  estimateButton: {
+    minHeight: 44,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.accent,
+    backgroundColor: 'rgba(53, 109, 120, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    marginVertical: spacing.xs,
+  },
+  estimateButtonText: {
+    ...typography.secondary,
+    fontWeight: '700',
+    color: palette.accent,
+  },
+  pressed: {
+    opacity: 0.8,
+  },
   savedBox: {
     backgroundColor: 'rgba(53,109,120,0.10)',
     borderRadius: radius.sm,

@@ -18,6 +18,16 @@ import { ManageAccountScopeUseCase } from '@/application/use-cases/manage-accoun
 import { RegisterLabPanelUseCase } from '@/application/use-cases/register-lab-panel';
 import { RunTrendAnalysisUseCase } from '@/application/use-cases/run-trend-analysis';
 import { CreateBaselineUseCase } from '@/application/use-cases/create-baseline';
+import { StartCameraInspectionUseCase } from '@/application/use-cases/start-camera-inspection';
+import { CaptureInspectionFrameUseCase } from '@/application/use-cases/capture-inspection-frame';
+import { AnalyzeInspectionCaptureUseCase } from '@/application/use-cases/analyze-inspection-capture';
+import { SaveCameraInspectionUseCase } from '@/application/use-cases/save-camera-inspection';
+import { CompareInspectionCapturesUseCase } from '@/application/use-cases/compare-inspection-captures';
+import { EstimatePulseVitalsUseCase } from '@/application/use-cases/estimate-pulse-vitals';
+import { SqliteInspectionRepository } from '@/infrastructure/repositories/sqlite-inspection-repository';
+import { ExpoImageEncoder } from '@/infrastructure/camera/image-encoder';
+import { ExpoFrameProcessor } from '@/infrastructure/camera/expo-frame-processor';
+import { ExpoCameraCapture } from '@/infrastructure/camera/expo-camera-capture';
 import { SqliteObservationRepository } from '@/infrastructure/repositories/sqlite-observation-repository';
 import { SqliteLabRepository } from '@/infrastructure/repositories/sqlite-lab-repository';
 import { SqliteAnalysisRepository } from '@/infrastructure/repositories/sqlite-analysis-repository';
@@ -57,6 +67,15 @@ interface AppServices {
   createBaseline: CreateBaselineUseCase;
   listRecentActivity: ListRecentActivityUseCase;
   syncNow: SyncNowUseCase | null;
+  inspectionRepository: SqliteInspectionRepository;
+  startCameraInspection: StartCameraInspectionUseCase;
+  captureInspectionFrame: CaptureInspectionFrameUseCase;
+  analyzeInspectionCapture: AnalyzeInspectionCaptureUseCase;
+  saveCameraInspection: SaveCameraInspectionUseCase;
+  compareInspectionCaptures: CompareInspectionCapturesUseCase;
+  estimatePulseVitals: EstimatePulseVitalsUseCase;
+  imageEncoder: ExpoImageEncoder;
+  cameraCapture: ExpoCameraCapture;
   supabase: SupabaseClient | null;
   /** true si Supabase está configurado por variables de entorno. */
   remoteConfigured: boolean;
@@ -100,6 +119,10 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
         const repository = new SqliteObservationRepository(opened.driver);
         const labRepository = new SqliteLabRepository(opened.driver);
         const analysisRepository = new SqliteAnalysisRepository(opened.driver);
+        const inspectionRepository = new SqliteInspectionRepository(opened.driver);
+        const imageEncoder = new ExpoImageEncoder();
+        const frameProcessor = new ExpoFrameProcessor();
+        const cameraCapture = new ExpoCameraCapture();
         const clock = new SystemClock();
         const ids = new CryptoIdGenerator();
         let supabase: SupabaseClient | null = null;
@@ -164,6 +187,29 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
             labRepository,
             listRecentActivity: new ListRecentActivityUseCase(repository, identity, clock),
             syncNow: supabase !== null ? new SyncNowUseCase(supabase, repository) : null,
+            inspectionRepository,
+            startCameraInspection: new StartCameraInspectionUseCase(identity, clock, ids),
+            captureInspectionFrame: new CaptureInspectionFrameUseCase(cameraCapture),
+            analyzeInspectionCapture: new AnalyzeInspectionCaptureUseCase(imageEncoder, frameProcessor),
+            saveCameraInspection: new SaveCameraInspectionUseCase(
+              inspectionRepository,
+              repository,
+              imageEncoder,
+              clock,
+              ids,
+            ),
+            compareInspectionCaptures: new CompareInspectionCapturesUseCase(
+              inspectionRepository,
+              ids,
+            ),
+            estimatePulseVitals: new EstimatePulseVitalsUseCase(
+              repository,
+              identity,
+              clock,
+              ids,
+            ),
+            imageEncoder,
+            cameraCapture,
             supabase,
             remoteConfigured: supabase !== null,
           },

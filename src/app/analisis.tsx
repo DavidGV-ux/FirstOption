@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Stack, useFocusEffect } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router, Stack, useFocusEffect } from 'expo-router';
 import { PrimaryButton } from '@/presentation/components/screen';
 import { Card } from '@/presentation/components/ui';
 import { useAppServices } from './_providers';
@@ -143,6 +143,17 @@ export default function AnalisisScreen() {
           diagnóstico ni una predicción.
         </Text>
 
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Aproximar signos vitales con la linterna del teléfono"
+          onPress={() => router.push('/linterna')}
+          style={({ pressed }) => [styles.pulseEstimateButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.pulseEstimateButtonText}>
+            ⚡ Medir pulso y aproximar vitales con linterna (PPG)
+          </Text>
+        </Pressable>
+
         {error !== null && (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
@@ -280,6 +291,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.border,
     backgroundColor: palette.surface,
+  },
+  pulseEstimateButton: {
+    minHeight: 46,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.accent,
+    backgroundColor: 'rgba(53, 109, 120, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.xs,
+  },
+  pulseEstimateButtonText: {
+    ...typography.secondary,
+    fontWeight: '700',
+    color: palette.accent,
+  },
+  pressed: {
+    opacity: 0.8,
   },
   eligibilityState: { ...typography.secondary, color: palette.accent, fontWeight: '600' },
   hintText: { ...typography.small, color: palette.textSecondary, marginTop: spacing.xs },
