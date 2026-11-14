@@ -55,7 +55,7 @@ create table if not exists public.observations (
   correction_reason text,
   created_at timestamptz not null default now(),
   server_received_at timestamptz not null default now(),
-  superseded_by uuid references public.observations (observation_id)
+  superseded_by text references public.observations (observation_id)
 );
 create index if not exists idx_observations_session
   on public.observations (session_id);

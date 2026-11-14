@@ -3,13 +3,11 @@
 -- Proyecto: trlxutcmumcfeeigogwm
 -- Aplicar en: Supabase Dashboard → SQL Editor → New query → Run
 -- Idempotente y no destructivo: se puede ejecutar más de una vez.
--- Incluye los 5 bloques en orden: identidad, mediciones, análisis/protocolos,
--- semilla del catálogo + trigger de perfil, y RLS completa.
 -- =====================================================================
 
 
 -- =====================================================================
--- BLOQUE 001: Órbita Salud — Propuesta de esquema remoto (Incremento 2)
+-- BLOQUE 001:
 -- =====================================================================
 
 -- Órbita Salud — Propuesta de esquema remoto (Incremento 2)
@@ -161,7 +159,7 @@ create index if not exists idx_audit_events_actor
 
 
 -- =====================================================================
--- BLOQUE 002: Órbita Salud — Propuesta: datos de medición (Incremento 2)
+-- BLOQUE 002:
 -- =====================================================================
 
 -- Órbita Salud — Propuesta: datos de medición (Incremento 2)
@@ -221,7 +219,7 @@ create table if not exists public.observations (
   correction_reason text,
   created_at timestamptz not null default now(),
   server_received_at timestamptz not null default now(),
-  superseded_by uuid references public.observations (observation_id)
+  superseded_by text references public.observations (observation_id)
 );
 create index if not exists idx_observations_session
   on public.observations (session_id);
@@ -271,7 +269,7 @@ create index if not exists idx_attachments_subject
 
 
 -- =====================================================================
--- BLOQUE 003: Órbita Salud — Propuesta: análisis reproducibles (Incrementos 4–5)
+-- BLOQUE 003:
 -- =====================================================================
 
 -- Órbita Salud — Propuesta: análisis reproducibles (Incrementos 4–5)
@@ -416,7 +414,7 @@ create table if not exists public.review_events (
 
 
 -- =====================================================================
--- BLOQUE 004: Órbita Salud — Propuesta: seed del catálogo + integración de auth
+-- BLOQUE 004:
 -- =====================================================================
 
 -- Órbita Salud — Propuesta: seed del catálogo + integración de auth
@@ -494,7 +492,7 @@ create trigger on_auth_user_created
 
 
 -- =====================================================================
--- BLOQUE 005: Órbita Salud — Propuesta: Row Level Security (Incremento 2)
+-- BLOQUE 005:
 -- =====================================================================
 
 -- Órbita Salud — Propuesta: Row Level Security (Incremento 2)
@@ -706,6 +704,5 @@ create policy "review_events_select_reviewer" on public.review_events
   for select using (reviewer = auth.uid());
 
 -- =====================================================================
--- FIN. Verifica en Table Editor: profiles, missions, measurement_sessions,
--- observations, metric_definitions, consents, audit_events, etc.
+-- FIN.
 -- =====================================================================
