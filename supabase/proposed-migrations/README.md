@@ -9,10 +9,11 @@ esquema público.
 
 ## Opción A — SQL Editor (más simple, sin tokens)
 
-1. Abre https://supabase.com/dashboard → proyecto `trlxutcmumcfeeigogwm`.
-2. SQL Editor → New query.
-3. Pega y ejecuta **en orden**:
-   1. `0001_identity_context_auditing.sql`
+**Alternativa de un solo archivo:** `000_all_in_one.sql` contiene los 5
+bloques en orden; pégalo entero en una sola query y ejecuta.
+
+Si prefieres hacerlo por bloques, ejecuta **en orden**:
+1. `0001_identity_context_auditing.sql`
    2. `0002_measurements.sql`
    3. `0003_analysis_protocols.sql`
    4. `0004_catalog_seed_auth.sql`
