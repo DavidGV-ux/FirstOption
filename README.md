@@ -1,56 +1,81 @@
-# Welcome to your Expo app 👋
+# Órbita Salud
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Prototipo móvil de seguimiento longitudinal de salud para astronautas o
+participantes en entornos análogos (misión análoga, confinamiento, etc.).
 
-## Get started
+> **Aviso importante.** Órbita Salud **no es un sistema certificado para
+> vuelo ni un dispositivo médico validado**. No diagnostica, no prescribe
+> y no infiere mediciones. Registra, describe y —en incrementos
+> posteriores— proyecta con métodos explícitos y reproducibles.
 
-1. Install dependencies
+## Estado actual (Incremento 1 completado)
 
-   ```bash
-   npm install
-   ```
+| Capacidad | Estado |
+|---|---|
+| Registro manual diario (ánimo, estrés, fatiga, sueño, síntomas, FC, PA, SpO₂, nota) | ✅ Implementado, pruebas unitarias |
+| Validación de entrada con reglas puras (Zod + reglas de dominio) | ✅ Implementado, 32 pruebas unitarias |
+| SQLite cifrado (SQLCipher) con migraciones versionadas | ✅ Implementado, 7 pruebas de integración sobre SQLite real |
+| Historial y último registro con antigüedad | ✅ Implementado |
+| Persistencia tras reinicio | ✅ Verificado con SQLite real en pruebas |
+| Sincronización Supabase (outbox, RLS) | ⏳ Incremento 2 — **no implementado** |
+| Hematología con documentos privados y líneas basales | ⏳ Incremento 3 — catálogo sembrado, UI pendiente |
+| Elegibilidad, descripción, tendencias | ⏳ Incremento 4 — no implementado |
+| Pronóstico de referencia y proyección experimental | ⏳ Incremento 5 — no implementado |
+| Protocolos, revisión, exportación | ⏳ Incremento 6 — no implementado |
+| Voz y pupila | ⏳ Después del núcleo, tras feature flags |
+| Ejecución verificada en dispositivo iOS/Android | ⏳ Pendiente: requiere development build |
 
-2. Start the app
+## Stack
 
-   ```bash
-   npx expo start
-   ```
+- React Native 0.88 + Expo SDK 58 (development build; **no Expo Go**:
+  SQLCipher no está disponible en Expo Go y la app se niega a degradar).
+- TypeScript strict, Expo Router, arquitectura hexagonal ligera.
+- `expo-sqlite` con SQLCipher (`useSQLCipher: true`), clave aleatoria por
+  instalación en Keychain/Keystore (`expo-secure-store`).
+- React Hook Form + Zod.
+- Pruebas: Jest (dominio/aplicación) + SQLite real con `node:sqlite`
+  (migraciones, persistencia, integridad).
 
-In the output, you'll find options to open the app in a
+## Requisitos
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- Node 22+, npm 10+.
+- Para ejecutar en dispositivo: Android Studio o Xcode configurados
+  (`npx expo run:android` / `run:ios`), o EAS Build.
 
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Comandos (verificados en este repositorio)
 
 ```bash
-npm run reset-project
+npm install
+npx tsc --noEmit          # verificación de tipos: OK
+npx jest                  # 32 pruebas unitarias: OK
+npm run test:integration  # 7 pruebas de integración con SQLite real: OK
+npx expo lint             # sin problemas
+npx expo-doctor           # 20/20 comprobaciones OK
+
+# Ejecutar en dispositivo (requiere build nativo con SQLCipher):
+npx expo run:android      # o: npx expo run:ios
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+## Documentación
 
-### Other setup steps
+- [`docs/product.md`](docs/product.md) — producto, alcance y límites.
+- [`docs/architecture.md`](docs/architecture.md) — hexagonal, puertos y flujos.
+- [`docs/evidence.md`](docs/evidence.md) — evidencia por afirmación.
+- [`docs/clinical-safety.md`](docs/clinical-safety.md) — restricciones clínicas.
+- [`docs/data-dictionary.md`](docs/data-dictionary.md) — tablas y campos.
+- [`docs/offline-sync.md`](docs/offline-sync.md) — política offline y plan de sync.
+- [`docs/analytics-methods.md`](docs/analytics-methods.md) — métodos y versiones.
+- [`docs/validation-plan.md`](docs/validation-plan.md) — plan de validación.
+- [`docs/model-cards/`](docs/model-cards/) — fichas de modelo (cuando existan).
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Referencia científica principal
 
-## Learn more
+Trudel G. et al. "Hemolysis contributes to anemia during long-duration
+space flight". *Nature Medicine* 28, 59–62 (2022).
+DOI: [10.1038/s41591-021-01637-7](https://doi.org/10.1038/s41591-021-01637-7).
 
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Interpretación documentada en `docs/evidence.md`: estudio con 14
+astronautas; ~54 % de aumento promedio de hemólisis respecto a
+pre-vuelo; **no** implica perder el 54 % de los glóbulos rojos ni
+permite pronósticos individuales. Este prototipo no convierte ese
+resultado grupal en reglas de alerta.

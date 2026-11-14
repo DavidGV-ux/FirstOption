@@ -2,7 +2,6 @@ import {
   createContext,
   useContext,
   useEffect,
-  useMemo,
   useState,
   type ReactNode,
 } from 'react';
@@ -13,8 +12,10 @@ import {
 } from '@/application/use-cases/register-daily-log';
 import { ListRecentActivityUseCase } from '@/application/use-cases/list-recent-activity';
 import { SqliteObservationRepository } from '@/infrastructure/repositories/sqlite-observation-repository';
-import { openAppDatabase } from '@/infrastructure/database/open-database';
-import { DatabaseEncryptionUnavailableError } from '@/infrastructure/database/open-database';
+import {
+  openAppDatabase,
+  DatabaseEncryptionUnavailableError,
+} from '@/infrastructure/database/open-database';
 import { SecureStoreKeyProvider } from '@/infrastructure/security/db-key-store';
 import { LocalSubjectIdentity } from '@/infrastructure/security/local-subject-identity';
 import { CryptoIdGenerator } from '@/infrastructure/ids/uuid-generator';

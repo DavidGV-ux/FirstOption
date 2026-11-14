@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, Stack, useFocusEffect } from 'expo-router';
-import type { LatestLogStatus, RecentLogEntry } from '@/application/use-cases/list-recent-activity';
-import { EmptyState, StatusChip } from '@/presentation/components/screen';
+import type { LatestLogStatus } from '@/application/use-cases/list-recent-activity';
+import { StatusChip } from '@/presentation/components/screen';
 import { useAppServices } from './providers';
 import { cardStyle, palette, radius, spacing, typography } from '@/presentation/theme/tokens';
 

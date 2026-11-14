@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { StyleSheet, ScrollView, Text, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useFocusEffect } from 'expo-router';
 import type { RecentLogEntry } from '@/application/use-cases/list-recent-activity';
 import { EmptyState, StatusChip } from '@/presentation/components/screen';
 import { cardStyle, palette, spacing, typography } from '@/presentation/theme/tokens';
@@ -47,9 +47,11 @@ export default function HistoryScreen() {
     }
   }, [services]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   if (error !== null) {
     return (
