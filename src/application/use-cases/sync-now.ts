@@ -202,6 +202,7 @@ export class SyncNowUseCase {
   private normalizeMetricCode(code: string): string {
     const fixes: Record<string, string> = {
       sympton_nausea: 'symptom_nausea',
+      symptom_nauseas: 'symptom_nausea',
     };
     return fixes[code] ?? code;
   }
