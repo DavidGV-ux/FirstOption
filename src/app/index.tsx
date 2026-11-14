@@ -267,6 +267,7 @@ export default function HomeScreen() {
         <SectionHeader title="Accesos rápidos" />
         <View style={styles.quickGrid}>
           {[
+            { title: 'Estado general', desc: 'Gráficas, rangos y resumen de salud.', route: '/estado' as const, label: 'Abrir estado general de salud' },
             { title: 'Historial', desc: 'Registros guardados en este dispositivo.', route: '/historial' as const, label: 'Abrir historial' },
             { title: 'Análisis', desc: 'Resumen estadístico y tendencias.', route: '/analisis' as const, label: 'Abrir análisis descriptivo' },
             { title: 'Linterna', desc: 'Inspección y pulso óptico experimental.', route: '/linterna' as const, label: 'Abrir linterna de inspección' },

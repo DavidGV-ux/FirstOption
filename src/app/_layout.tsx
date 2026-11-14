@@ -25,6 +25,7 @@ export default function RootLayout() {
         <Stack.Screen name="laboratorio" options={{ title: 'Registro hematológico' }} />
         <Stack.Screen name="basales" options={{ title: 'Líneas basales' }} />
         <Stack.Screen name="analisis" options={{ title: 'Análisis descriptivo' }} />
+        <Stack.Screen name="estado" options={{ title: 'Estado general' }} />
       </Stack>
     </AppServicesProvider>
   );
