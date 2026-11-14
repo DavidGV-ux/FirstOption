@@ -94,8 +94,29 @@ export const dailyLogInputSchema = z
       'la presión diastólica',
     ),
     spo2: optionalInt(SPO2_BOUNDS.min, SPO2_BOUNDS.max, 'la saturación'),
-    symptoms: z.record(z.string().min(1), z.boolean()),
-    note: z.string().max(NOTE_MAX_LENGTH, `La nota admite hasta ${NOTE_MAX_LENGTH} caracteres`).trim().nullable(),
+    // Síntomas opcionales: solo se envían como true los presentes.
+    symptoms: z
+      .record(z.string().min(1), z.boolean().optional())
+      .transform((rec) => {
+        const out: Record<string, boolean> = {};
+        for (const [k, v] of Object.entries(rec)) {
+          if (v === true) out[k] = true;
+        }
+        return out;
+      })
+      .default({}),
+    // Nota opcional: vacío se trata como ausente.
+    note: z.preprocess(
+      (v) => {
+        if (v === null || v === undefined) return null;
+        if (typeof v === 'string') {
+          const t = v.trim();
+          return t.length === 0 ? null : t;
+        }
+        return v;
+      },
+      z.string().max(NOTE_MAX_LENGTH, `La nota admite hasta ${NOTE_MAX_LENGTH} caracteres`).nullable(),
+    ),
   })
   .superRefine((input, ctx) => {
     // Presión arterial: o ambas o ninguna.

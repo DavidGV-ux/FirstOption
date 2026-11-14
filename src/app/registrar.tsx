@@ -44,7 +44,7 @@ export default function RegisterScreen() {
     setError,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    resolver: zodResolver(dailyLogInputSchema),
+    resolver: zodResolver(dailyLogInputSchema as any),
     defaultValues: {
       observedAt: new Date().toISOString(),
       missionPhase: undefined as unknown as FormValues['missionPhase'],
@@ -67,7 +67,7 @@ export default function RegisterScreen() {
     async (values) => {
       setSubmitError(null);
       try {
-        const result = await services.registerDailyLog.execute(values);
+        const result = await services.registerDailyLog.execute(values as any);
         setSaved(
           `Registro guardado en el dispositivo (${result.observationCount} medición(es)). Sin sincronizar todavía.`,
         );
@@ -87,8 +87,13 @@ export default function RegisterScreen() {
         }
       }
     },
-    () => {
-      setSubmitError('Revisa los campos marcados antes de guardar.');
+    (formErrors) => {
+      // Mostrar detalle para que la persona sepa qué falta o está mal.
+      const first = Object.values(formErrors).find((e) => e && typeof e === 'object' && 'message' in e) as
+        | { message?: string }
+        | undefined;
+      const hint = first?.message ? ` ${first.message}` : '';
+      setSubmitError(`Revisa los campos marcados antes de guardar.${hint}`);
     },
   );
 
