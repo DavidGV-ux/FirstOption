@@ -152,9 +152,9 @@ export class SyncNowUseCase {
     const sessionId = String(raw.session_id ?? '');
     const rawMetricId = String(raw.metric_id ?? raw.metric_code ?? 'unknown_metric');
     const metricId = this.normalizeMetricCode(rawMetricId);
-    const value = raw.value_original ?? raw.value_numeric ?? null;
+    const value = raw.value_original ?? raw.value_numeric ?? raw.value_boolean ?? null;
     const numericValue =
-      typeof value === 'number' ? value : value === null ? null : Number(value);
+      typeof value === 'number' ? value : value === null || typeof value === 'boolean' ? null : Number(value);
     const measuredAt = String(raw.observed_at ?? raw.measured_at ?? raw.created_at ?? new Date().toISOString());
     const qualityState = String(raw.quality_state ?? raw.quality_status ?? 'ok');
     const qualityStatus =
@@ -166,6 +166,13 @@ export class SyncNowUseCase {
             ? 'inconclusive'
             : 'not_assessed';
 
+    // Síntomas/booleanos: el remoto exige value_boolean para métricas booleanas.
+    const isBooleanMetric = metricId.startsWith('symptom_') || typeof value === 'boolean';
+    const valueBoolean = isBooleanMetric
+      ? (typeof value === 'boolean' ? value : Number(value) === 1)
+      : null;
+    const valueNumeric = isBooleanMetric ? null : (Number.isFinite(numericValue) ? numericValue : null);
+
     return {
       table: 'observations',
       onConflict: 'client_request_id',
@@ -176,9 +183,9 @@ export class SyncNowUseCase {
         created_by: userId,
         session_id: sessionId ? this.toUuid(sessionId) : null,
         metric_code: metricId,
-        value_numeric: Number.isFinite(numericValue) ? numericValue : null,
+        value_numeric: valueNumeric,
         value_text: null,
-        value_boolean: null,
+        value_boolean: valueBoolean,
         unit_code: (raw.unit_original as string | null) ?? (raw.unit_code as string | null) ?? null,
         measured_at: measuredAt,
         recorded_at: measuredAt,
