@@ -300,6 +300,15 @@ export default function HomeScreen() {
             <Text style={styles.linkTitle}>Laboratorio</Text>
             <Text style={styles.bodyText}>Registrar resultado hematológico.</Text>
           </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Gestionar líneas basales"
+            onPress={() => router.push('/basales')}
+            style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
+          >
+            <Text style={styles.linkTitle}>Basales</Text>
+            <Text style={styles.bodyText}>Líneas basales versionadas.</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </>

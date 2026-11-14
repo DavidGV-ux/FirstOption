@@ -1,10 +1,6 @@
 import type { Clock } from '@/domain/shared/clock';
 import type { IdGenerator } from '@/domain/shared/ids';
-import type { MissionPhase } from '@/domain/observations/observation';
-import type {
-  MeasurementSession,
-  SyncState,
-} from '@/domain/observations/observation';
+import type { MissionPhase, MeasurementSession, SyncState } from '@/domain/observations/observation';
 import type { ObservationRepository, SubjectIdentityStore } from '@/domain/repositories/observation-repository';
 import type { LabRepository, SaveLabPanelInput } from '@/domain/repositories/lab-repository';
 import { localDateFromIso } from './register-daily-log';

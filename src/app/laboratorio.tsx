@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput } from 'react-native';
 import { Stack } from 'expo-router';
 import { METRIC_CATALOG_V1 } from '@/domain/metrics/catalog-v1';
 import { MISSION_PHASES, MISSION_PHASE_LABELS_ES } from '@/domain/observations/observation';

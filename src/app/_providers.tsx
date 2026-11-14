@@ -17,6 +17,7 @@ import { DocumentPupilInspectionUseCase } from '@/application/use-cases/document
 import { ManageAccountScopeUseCase } from '@/application/use-cases/manage-account';
 import { RegisterLabPanelUseCase } from '@/application/use-cases/register-lab-panel';
 import { RunTrendAnalysisUseCase } from '@/application/use-cases/run-trend-analysis';
+import { CreateBaselineUseCase } from '@/application/use-cases/create-baseline';
 import { SqliteObservationRepository } from '@/infrastructure/repositories/sqlite-observation-repository';
 import { SqliteLabRepository } from '@/infrastructure/repositories/sqlite-lab-repository';
 import { SqliteAnalysisRepository } from '@/infrastructure/repositories/sqlite-analysis-repository';
@@ -53,6 +54,7 @@ interface AppServices {
   labRepository: SqliteLabRepository;
   analysisRepository: SqliteAnalysisRepository;
   runTrendAnalysis: RunTrendAnalysisUseCase;
+  createBaseline: CreateBaselineUseCase;
   listRecentActivity: ListRecentActivityUseCase;
   syncNow: SyncNowUseCase | null;
   supabase: SupabaseClient | null;
@@ -143,6 +145,13 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
             runTrendAnalysis: new RunTrendAnalysisUseCase(
               repository,
               analysisRepository,
+              identity,
+              clock,
+              ids,
+            ),
+            createBaseline: new CreateBaselineUseCase(
+              repository,
+              labRepository,
               identity,
               clock,
               ids,

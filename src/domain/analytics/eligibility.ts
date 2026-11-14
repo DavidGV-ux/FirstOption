@@ -40,6 +40,12 @@ export interface EligibilityInput {
   methodChanged: boolean;
   /** Si la métrica es soportada por el catálogo. */
   metricSupported: boolean;
+  /** Si se detectaron duplicados (misma fecha/valor). */
+  hasDuplicates?: boolean;
+  /** Número de observaciones con calidad insuficiente. */
+  lowQualityCount?: number;
+  /** Si la serie es comparable (mismo método/dispositivo). */
+  comparable?: boolean;
 }
 
 /**
@@ -78,6 +84,24 @@ export function evaluateEligibility(
     return {
       state: 'not_comparable',
       reason: 'Cambio de método o dispositivo durante el periodo.',
+    };
+  }
+  if (input.hasDuplicates) {
+    return {
+      state: 'not_comparable',
+      reason: 'Se detectaron duplicados en la serie.',
+    };
+  }
+  if ((input.lowQualityCount ?? 0) > 0) {
+    return {
+      state: 'inconclusive',
+      reason: `${input.lowQualityCount} observación(es) con calidad insuficiente.`,
+    };
+  }
+  if (input.comparable === false) {
+    return {
+      state: 'not_comparable',
+      reason: 'Las observaciones no son comparables entre sí.',
     };
   }
   return { state: 'ok', reason: 'Serie elegible para análisis descriptivo.' };

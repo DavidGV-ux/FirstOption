@@ -12,7 +12,7 @@ export interface AnalysisRunInput {
   status: 'completed' | 'insufficient_data' | 'inconclusive' | 'not_comparable' | 'unsupported' | 'failed';
   result: TrendResult;
   limitations: string;
-  inputs: Array<{ observationId: string; metricId: string; observedAt: string; valueOriginal: number; unitOriginal: string }>;
+  inputs: { observationId: string; metricId: string; observedAt: string; valueOriginal: number; unitOriginal: string }[];
 }
 
 export interface AnalysisRunRecord {
