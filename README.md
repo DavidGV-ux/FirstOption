@@ -1,12 +1,10 @@
-# Órbita Salud
+# firstOption
 
-Prototipo móvil de seguimiento longitudinal de salud para astronautas o
-participantes en entornos análogos (misión análoga, confinamiento, etc.).
+Seguimiento personal de salud: registros, análisis y herramientas experimentales, con enfoque privado y offline.
 
-> **Aviso importante.** Órbita Salud **no es un sistema certificado para
-> vuelo ni un dispositivo médico validado**. No diagnostica, no prescribe
-> y no infiere mediciones. Registra, describe y —en incrementos
-> posteriores— proyecta con métodos explícitos y reproducibles.
+Prototipo móvil de seguimiento longitudinal (contextos análogos, bienestar y registro diario) construido con React Native + Expo.
+
+> **Aviso importante.** firstOption **no es un sistema certificado ni un dispositivo médico validado**. No diagnostica, no prescribe y no infiere conclusiones clínicas. Registra, describe y —cuando aplica— ofrece estimaciones experimentales con métodos explícitos y limitaciones visibles.
 
 ## Estado actual (Incrementos 1–4 + trabajo en curso de inspección por cámara)
 

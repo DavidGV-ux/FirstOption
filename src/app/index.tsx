@@ -92,9 +92,11 @@ export default function HomeScreen() {
 
   const entry = status?.entry ?? null;
 
+  const todayDone = status?.isToday === true;
+
   return (
     <>
-      <Stack.Screen options={{ title: 'Órbita Salud' }} />
+      <Stack.Screen options={{ title: 'Inicio' }} />
       <ScrollView
         style={styles.flex}
         contentContainerStyle={[
@@ -104,73 +106,77 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Hero */}
+        <View style={styles.hero}>
+          <Text style={styles.heroKicker}>Tu espacio de bienestar</Text>
+          <Text style={styles.heroTitle}>firstOption</Text>
+          <Text style={styles.heroDescription}>
+            Seguimiento personal de salud: registra tu día, consulta tu historial y análisis, y usa
+            herramientas experimentales con enfoque privado y offline.
+          </Text>
+          <View style={styles.heroRow}>
+            <StatusBadge label={todayDone ? 'Hoy registrado' : 'Pendiente hoy'} tone={todayDone ? 'success' : 'attention'} />
+            <Text style={styles.heroMeta}>
+              {accountScope?.kind === 'remote'
+                ? `Cuenta: ${accountScope.email ?? 'activa'}`
+                : 'Modo local en este dispositivo'}
+            </Text>
+          </View>
+          <View style={styles.heroActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Registrar seguimiento"
+              onPress={() => router.push('/registrar')}
+              style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, styles.heroPrimary]}
+            >
+              <Text style={styles.primaryButtonLabel}>Registrar seguimiento</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ver historial"
+              onPress={() => router.push('/historial')}
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed, styles.heroSecondary]}
+            >
+              <Text style={styles.secondaryButtonLabel}>Ver historial</Text>
+            </Pressable>
+          </View>
+        </View>
+
         {error !== null && (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
 
-        {/* Registro de hoy */}
-        <Card title="Registro de hoy">
-          {status !== null && status.isToday ? (
-            <Text style={styles.bodyText}>
-              Ya existe un registro con fecha de hoy. Puedes registrar otro
-              momento del día si lo necesitas.
-            </Text>
-          ) : entry !== null ? (
-            <Text style={styles.bodyText}>
-              El último registro no es de hoy. Registrar el seguimiento diario
-              es una tarea pendiente.
-            </Text>
-          ) : (
-            <Text style={styles.bodyText}>
-              Aún no hay mediciones registradas. Registrar el primer seguimiento
-              es una tarea pendiente.
-            </Text>
-          )}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Registrar seguimiento"
-            onPress={() => router.push('/registrar')}
-            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
-          >
-            <Text style={styles.primaryButtonLabel}>Registrar seguimiento</Text>
-          </Pressable>
-        </Card>
+        {/* Resumen */}
+        <SectionHeader title="Resumen" />
+        <View style={styles.gridRow}>
+          <Card title="Registro de hoy" style={styles.gridCard}>
+            {status !== null && status.isToday ? (
+              <Text style={styles.bodyText}>Ya registraste hoy. Puedes añadir otro momento si lo necesitas.</Text>
+            ) : entry !== null ? (
+              <Text style={styles.bodyText}>El último registro no es de hoy. Es un buen momento para actualizar tu seguimiento.</Text>
+            ) : (
+              <Text style={styles.bodyText}>Aún no hay mediciones. Empieza con tu primer registro.</Text>
+            )}
+          </Card>
 
-        {/* Última medición */}
-        <Card title="Última medición">
-          {entry !== null ? (
-            <>
-              <Text style={styles.summaryText}>
-                {entry.summaryParts.length > 0
-                  ? entry.summaryParts.join(' · ')
-                  : 'Sin observaciones en esta sesión.'}
-              </Text>
-              <Text style={styles.noteText}>
-                {entry.missionPhase} · {entry.age.label} ·{' '}
-                {entry.syncState === 'local_only' ? 'Solo en dispositivo' : entry.syncState}
-              </Text>
-              {entry.note !== null && (
-                <Text style={styles.noteText} numberOfLines={2}>
-                  {entry.note}
+          <Card title="Última medición" style={styles.gridCard}>
+            {entry !== null ? (
+              <>
+                <Text style={styles.summaryText} numberOfLines={3}>
+                  {entry.summaryParts.length > 0 ? entry.summaryParts.join(' · ') : 'Sin observaciones en esta sesión.'}
                 </Text>
-              )}
-            </>
-          ) : (
-            <Text style={styles.bodyText}>Aún no hay mediciones registradas.</Text>
-          )}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Ver evolución en historial"
-            onPress={() => router.push('/historial')}
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-          >
-            <Text style={styles.secondaryButtonLabel}>Ver evolución</Text>
-          </Pressable>
-        </Card>
+                <Text style={styles.noteText}>
+                  {entry.missionPhase} · {entry.age.label} · {entry.syncState === 'local_only' ? 'Solo en dispositivo' : entry.syncState}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.bodyText}>Sin registros recientes.</Text>
+            )}
+          </Card>
+        </View>
 
-        {/* Actividad reciente */}
         <Card title="Actividad reciente">
           {entry !== null ? (
             <View style={styles.row}>
@@ -187,7 +193,8 @@ export default function HomeScreen() {
           )}
         </Card>
 
-        {/* Cuenta y alcance por usuario */}
+        {/* Cuenta y sincronización */}
+        <SectionHeader title="Cuenta y sincronización" />
         <Card title="Cuenta">
           <Text style={styles.bodyText}>
             {accountScope?.kind === 'remote'
@@ -208,8 +215,7 @@ export default function HomeScreen() {
               {localCount > 0 && (
                 <>
                   <Text style={styles.noteText}>
-                    Tienes {localCount} registro(s) del dispositivo sin asociar a
-                    tu cuenta. Puedes asociarlos explícitamente.
+                    Tienes {localCount} registro(s) del dispositivo sin asociar a tu cuenta. Puedes asociarlos explícitamente.
                   </Text>
                   <Pressable
                     accessibilityRole="button"
@@ -220,9 +226,7 @@ export default function HomeScreen() {
                         setAdoptMsg(`Se asociaron ${n} registro(s) a tu cuenta.`);
                         await load();
                       } catch (e) {
-                        setAdoptMsg(
-                          e instanceof Error ? e.message : 'No se pudo asociar. Inténtalo de nuevo.',
-                        );
+                        setAdoptMsg(e instanceof Error ? e.message : 'No se pudo asociar. Inténtalo de nuevo.');
                       }
                     }}
                     style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
@@ -231,9 +235,7 @@ export default function HomeScreen() {
                   </Pressable>
                 </>
               )}
-              {adoptMsg !== null && (
-                <Text style={styles.noteText}>{adoptMsg}</Text>
-              )}
+              {adoptMsg !== null && <Text style={styles.noteText}>{adoptMsg}</Text>}
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Cerrar sesión"
@@ -261,55 +263,32 @@ export default function HomeScreen() {
           configured={services.remoteConfigured}
         />
 
-        {/* Accesos */}
-        <SectionHeader title="Más" />
-        <View style={[styles.row, { flexWrap: 'wrap' }]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Abrir historial"
-            onPress={() => router.push('/historial')}
-            style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
-          >
-            <Text style={styles.linkTitle}>Historial</Text>
-            <Text style={styles.bodyText}>Registros guardados en este dispositivo.</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Abrir análisis descriptivo"
-            onPress={() => router.push('/analisis')}
-            style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
-          >
-            <Text style={styles.linkTitle}>Análisis</Text>
-            <Text style={styles.bodyText}>Resumen estadístico por tiempo real.</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Abrir linterna de inspección"
-            onPress={() => router.push('/linterna')}
-            style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
-          >
-            <Text style={styles.linkTitle}>Linterna</Text>
-            <Text style={styles.bodyText}>Inspección pupilar documentada.</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Registrar resultado hematológico"
-            onPress={() => router.push('/laboratorio')}
-            style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
-          >
-            <Text style={styles.linkTitle}>Laboratorio</Text>
-            <Text style={styles.bodyText}>Registrar resultado hematológico.</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Gestionar líneas basales"
-            onPress={() => router.push('/basales')}
-            style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
-          >
-            <Text style={styles.linkTitle}>Basales</Text>
-            <Text style={styles.bodyText}>Líneas basales versionadas.</Text>
-          </Pressable>
+        {/* Accesos rápidos */}
+        <SectionHeader title="Accesos rápidos" />
+        <View style={styles.quickGrid}>
+          {[
+            { title: 'Historial', desc: 'Registros guardados en este dispositivo.', route: '/historial' as const, label: 'Abrir historial' },
+            { title: 'Análisis', desc: 'Resumen estadístico y tendencias.', route: '/analisis' as const, label: 'Abrir análisis descriptivo' },
+            { title: 'Linterna', desc: 'Inspección y pulso óptico experimental.', route: '/linterna' as const, label: 'Abrir linterna de inspección' },
+            { title: 'Laboratorio', desc: 'Resultados hematológicos y conversiones.', route: '/laboratorio' as const, label: 'Registrar resultado hematológico' },
+            { title: 'Basales', desc: 'Líneas basales versionadas.', route: '/basales' as const, label: 'Gestionar líneas basales' },
+          ].map((item) => (
+            <Pressable
+              key={item.route}
+              accessibilityRole="button"
+              accessibilityLabel={item.label}
+              onPress={() => router.push(item.route)}
+              style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
+            >
+              <Text style={styles.linkTitle}>{item.title}</Text>
+              <Text style={styles.bodyText}>{item.desc}</Text>
+            </Pressable>
+          ))}
         </View>
+
+        <Text style={styles.footerNote}>
+          firstOption no es un dispositivo médico. Las estimaciones experimentales se muestran con sus limitaciones.
+        </Text>
       </ScrollView>
     </>
   );
@@ -317,14 +296,38 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: palette.background },
-  content: { paddingVertical: spacing.lg, gap: spacing.md },
+  content: { paddingVertical: spacing.lg, gap: spacing.lg },
+  hero: {
+    backgroundColor: palette.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: palette.border,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  heroKicker: {
+    ...typography.small,
+    color: palette.accent,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  heroTitle: { ...typography.title, color: palette.textPrimary },
+  heroDescription: { ...typography.body, color: palette.textSecondary },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  heroMeta: { ...typography.secondary, color: palette.textSecondary },
+  heroActions: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', marginTop: spacing.xs },
+  heroPrimary: { marginTop: 0, flexGrow: 1 },
+  heroSecondary: { marginTop: 0, alignSelf: 'center' },
+  gridRow: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' },
+  gridCard: { flex: 1, minWidth: 220 },
+  quickGrid: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   bodyText: { ...typography.body, color: palette.textSecondary },
   summaryText: { ...typography.body, color: palette.textPrimary },
   noteText: { ...typography.secondary, color: palette.textSecondary, fontStyle: 'italic' },
   row: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   primaryButton: {
     minHeight: 48,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     backgroundColor: palette.accent,
     alignItems: 'center',
     justifyContent: 'center',
@@ -335,7 +338,7 @@ const styles = StyleSheet.create({
   primaryButtonLabel: { ...typography.body, color: palette.accentOnSurface, fontWeight: '600' },
   secondaryButton: {
     minHeight: 48,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: palette.accent,
     alignItems: 'center',
@@ -347,7 +350,8 @@ const styles = StyleSheet.create({
   },
   secondaryButtonLabel: { ...typography.secondary, color: palette.accent, fontWeight: '600' },
   linkCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 160,
     minWidth: 150,
     backgroundColor: palette.surface,
     borderRadius: radius.md,
@@ -356,14 +360,15 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.xs,
   },
-  linkTitle: { ...typography.cardTitle, color: palette.accent },
-  pressed: { opacity: 0.85 },
+  linkTitle: { ...typography.cardTitle, color: palette.textPrimary },
+  pressed: { opacity: 0.9 },
   errorBox: {
     backgroundColor: 'rgba(163,52,58,0.08)',
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: palette.priority,
     padding: spacing.sm,
   },
   errorText: { ...typography.secondary, color: palette.priority, fontWeight: '600' },
+  footerNote: { ...typography.small, color: palette.textSecondary, textAlign: 'center', marginTop: spacing.xs },
 });

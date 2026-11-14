@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "Órbita Salud",
+    "name": "firstOption",
     "slug": "orbita-salud",
     "version": "0.1.0",
+    "description": "Seguimiento personal de salud: registros, análisis y herramientas experimentales, con enfoque privado y offline.",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "orbitasalud",
@@ -48,7 +49,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Órbita Salud usa la cámara solo para controlar la linterna (LED) durante la inspección pupilar. No se graban fotos, videos ni audio.",
+          "cameraPermission": "firstOption usa la cámara para la linterna y funciones de inspección/captura asistida. No se graban audio ni imágenes sin tu consentimiento.",
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": false
         }

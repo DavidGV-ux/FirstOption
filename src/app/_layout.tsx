@@ -14,7 +14,7 @@ export default function RootLayout() {
           headerShadowVisible: false,
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'Órbita Salud' }} />
+        <Stack.Screen name="index" options={{ title: 'firstOption' }} />
         <Stack.Screen
           name="registrar"
           options={{ title: 'Registrar seguimiento' }}
