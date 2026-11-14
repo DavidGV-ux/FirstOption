@@ -3,6 +3,7 @@ import { MIGRATION_V1_STATEMENTS, MIGRATION_V1_CATALOG_SQL } from './v001-initia
 import { MIGRATION_V2_STATEMENTS } from './v002-sync';
 import { MIGRATION_V3_STATEMENTS } from './v003-lab-baselines-documents';
 import { MIGRATION_V4_STATEMENTS } from './v004-analysis-runs';
+import { MIGRATION_V5_STATEMENTS } from './v005-local-auth';
 import { METRIC_CATALOG_V1, METRIC_CATALOG_VERSION } from '@/domain/metrics/catalog-v1';
 
 export interface Migration {
@@ -65,6 +66,38 @@ export const MIGRATIONS: readonly Migration[] = [
     version: 4,
     async apply(driver) {
       for (const sql of MIGRATION_V4_STATEMENTS) {
+        await driver.exec(sql);
+      }
+    },
+  },
+  {
+    version: 5,
+    async apply(driver) {
+      for (const sql of MIGRATION_V5_STATEMENTS) {
+        await driver.exec(sql);
+      }
+      // Columnas nuevas en tablas existentes (idempotente vía try/catch).
+      const alters = [
+        `ALTER TABLE measurement_sessions ADD COLUMN remote_user_id TEXT`,
+        `ALTER TABLE measurement_sessions ADD COLUMN client_request_id TEXT`,
+        `ALTER TABLE observations ADD COLUMN remote_user_id TEXT`,
+        `ALTER TABLE observations ADD COLUMN client_request_id TEXT`,
+      ];
+      for (const sql of alters) {
+        try {
+          await driver.exec(sql);
+        } catch {
+          // Columna ya existe: ignorar.
+        }
+      }
+      // Índices únicos (idempotentes).
+      const indexes = [
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_client_request ON measurement_sessions (client_request_id) WHERE client_request_id IS NOT NULL`,
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_observations_client_request ON observations (client_request_id) WHERE client_request_id IS NOT NULL`,
+        `CREATE INDEX IF NOT EXISTS idx_sessions_remote_user ON measurement_sessions (remote_user_id)`,
+        `CREATE INDEX IF NOT EXISTS idx_observations_remote_user ON observations (remote_user_id)`,
+      ];
+      for (const sql of indexes) {
         await driver.exec(sql);
       }
     },

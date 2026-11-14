@@ -123,8 +123,8 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
       await this.driver.run(
         `INSERT INTO measurement_sessions
            (session_id, subject_id, mission_phase, recorded_at, recorded_local_date,
-            source, note, sync_state, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            source, note, sync_state, created_at, remote_user_id, client_request_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           session.sessionId,
           session.subjectId,
@@ -135,6 +135,8 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
           session.note,
           session.syncState,
           session.createdAt,
+          null, // remote_user_id se actualiza al sincronizar
+          session.sessionId, // client_request_id = session_id para idempotencia
         ],
       );
 
@@ -144,8 +146,8 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
           `INSERT INTO observations
              (observation_id, session_id, metric_id, value_original, unit_original,
               value_normalized, unit_normalized, observed_at, local_date,
-              quality_state, sync_state, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              quality_state, sync_state, created_at, remote_user_id, client_request_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             this.observationId(session.sessionId, obs),
             session.sessionId,
@@ -159,6 +161,8 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
             obs.qualityState ?? 'ok',
             session.syncState,
             createdAt,
+            null,
+            this.observationId(session.sessionId, obs),
           ],
         );
         // Entrada de outbox (misma transacción, idempotente por entidad).
@@ -175,6 +179,7 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
             local_date: obs.localDate,
             quality_state: obs.qualityState ?? 'ok',
             created_at: createdAt,
+            client_request_id: this.observationId(session.sessionId, obs),
           },
           createdAt,
         );
@@ -190,6 +195,7 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
         source: session.source,
         note: session.note,
         created_at: session.createdAt,
+        client_request_id: session.sessionId,
       }, createdAt);
     });
   }
