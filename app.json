@@ -9,6 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.davidg11.orbitasalud",
       "supportsTablet": false
     },
     "android": {

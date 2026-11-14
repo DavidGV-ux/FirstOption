@@ -16,6 +16,7 @@ participantes en entornos análogos (misión análoga, confinamiento, etc.).
 | Validación de entrada con reglas puras (Zod + reglas de dominio) | ✅ Implementado, 32 pruebas unitarias |
 | SQLite cifrado (SQLCipher) con migraciones versionadas | ✅ Implementado, 7 pruebas de integración sobre SQLite real |
 | Historial y último registro con antigüedad | ✅ Implementado |
+| Modo Expo Go (demo explícito, sin cifrado, con banner permanente) | ✅ Implementado (código); pendiente de prueba en dispositivo |
 | Persistencia tras reinicio | ✅ Verificado con SQLite real en pruebas |
 | Sincronización Supabase (outbox, RLS) | ⏳ Incremento 2 — **no implementado** |
 | Hematología con documentos privados y líneas basales | ⏳ Incremento 3 — catálogo sembrado, UI pendiente |
@@ -39,8 +40,39 @@ participantes en entornos análogos (misión análoga, confinamiento, etc.).
 ## Requisitos
 
 - Node 22+, npm 10+.
-- Para ejecutar en dispositivo: Android Studio o Xcode configurados
-  (`npx expo run:android` / `run:ios`), o EAS Build.
+- Cuenta de Expo (para EAS Build; el proyecto está preparado con `eas.json`).
+
+## Ejecutar en Expo Go (modo demo, sin cifrado)
+
+Expo Go **no incluye SQLCipher** (limitación verificada en la
+documentación de expo-sqlite). Para probar la interfaz en Expo Go:
+
+```bash
+# En .env (no se sube al repositorio):
+# EXPO_PUBLIC_DATA_MODE=demo
+# EXPO_PUBLIC_ALLOW_UNENCRYPTED_DB=1
+npm install
+npx expo start          # escanear el QR con Expo Go
+```
+
+En este modo la app corre sobre una base SQLite **sin cifrar y
+separada** (`orbita_salud_demo.db`) y muestra un **banner permanente**:
+"Sin cifrado (Expo Go) — almacenamiento de prueba, no para datos
+reales". Nunca es silencioso: sin ese permiso explícito, la app se
+bloquea con un mensaje claro en lugar de degradar.
+
+## Development build (cifrado con SQLCipher — configuración recomendada)
+
+```bash
+npx eas-cli login                 # cuenta de Expo
+npm run build:dev                 # eas build --profile development --platform android
+# o, con Xcode/Android Studio locales:
+npx expo run:android              # / run:ios
+```
+
+El build de desarrollo sí incluye SQLCipher: la app verifica
+`PRAGMA cipher_version` antes de aplicar la clave; si no hay cifrado,
+se bloquea con un mensaje explícito.
 
 ## Comandos (verificados en este repositorio)
 

@@ -67,6 +67,10 @@ Cada afirmación relevante se clasifica en una de estas categorías:
 - **PRAGMA cipher_version en binario nativo** (development build con
   `useSQLCipher=true`): la verificación está implementada pero no
   ejecutada en dispositivo.
+- **Modo Expo Go sin cifrado** (demo explícito con banner): código
+  implementado; prueba en dispositivo pendiente. Este modo usa una base
+  separada (`orbita_salud_demo.db`) y solo está permitido con
+  `EXPO_PUBLIC_ALLOW_UNENCRYPTED_DB=1` y `EXPO_PUBLIC_DATA_MODE=demo`.
 - **Flujos completos en iOS y Android** (persistencia tras reinicio
   real, permisos, teclados).
 - **Contraste de colores** calculado contra WCAG AA con las parejas de

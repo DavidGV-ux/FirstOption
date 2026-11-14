@@ -6,6 +6,21 @@ La app implementa (o implementará) cada nivel del principio
 fundamental de forma separada y verificable. Ninguna pantalla muestra
 actualmente un nivel 2 o superior: solo medición y estado de registro.
 
+## Seguridad del almacenamiento
+
+- **Development build (configuración recomendada):** base cifrada con
+  SQLCipher; `PRAGMA cipher_version` se verifica antes de aplicar la
+  clave; sin cifrado, la app se bloquea con mensaje explícito.
+- **Expo Go (solo demo):** Expo Go no incluye SQLCipher (limitación
+  verificada). Existe un modo de prueba **explícito y no silencioso**:
+  requiere `EXPO_PUBLIC_ALLOW_UNENCRYPTED_DB=1` y
+  `EXPO_PUBLIC_DATA_MODE=demo`, usa una base separada sin cifrar
+  (`orbita_salud_demo.db`) y muestra un **banner permanente** en toda
+  la app. Está prohibido mezclarlo con datos reales.
+- **Clave SQLCipher:** aleatoria por instalación (32 bytes de
+  `expo-crypto`), guardada en Keychain/Keystore con
+  `WHEN_UNLOCKED_THIS_DEVICE_ONLY`; nunca en logs ni en el repositorio.
+
 ## Reglas activas en el Incremento 1
 
 1. **No diagnosticar.** Ningún texto de la UI diagnostica anemia,

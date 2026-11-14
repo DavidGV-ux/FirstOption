@@ -15,6 +15,7 @@ import { SqliteObservationRepository } from '@/infrastructure/repositories/sqlit
 import {
   openAppDatabase,
   DatabaseEncryptionUnavailableError,
+  isUnencryptedDemoModeAllowed,
 } from '@/infrastructure/database/open-database';
 import { SecureStoreKeyProvider } from '@/infrastructure/security/db-key-store';
 import { LocalSubjectIdentity } from '@/infrastructure/security/local-subject-identity';
@@ -27,6 +28,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 });
 
 const DATABASE_NAME = 'orbita_salud.db';
+const DEMO_DATABASE_NAME = 'orbita_salud_demo.db';
 
 interface AppServices {
   registerDailyLog: RegisterDailyLogUseCase;
@@ -45,13 +47,14 @@ export function useAppServices(): AppServices {
 
 type BootState =
   | { phase: 'loading' }
-  | { phase: 'ready'; services: AppServices; cipherVersion: string }
+  | { phase: 'ready'; services: AppServices; encrypted: boolean }
   | { phase: 'error'; kind: 'encryption'; message: string };
 
 /**
- * Proveedor raíz: abre la base cifrada antes de montar la navegación.
- * Si el cifrado no está disponible (p. ej. Expo Go), muestra un bloqueo
- * explícito: nunca degrada a una base sin cifrar.
+ * Proveedor raíz: abre la base (cifrada si el binario lo permite)
+ * antes de montar la navegación. Sin cifrado, solo continúa en modo
+ * demo explícito con banner permanente; en cualquier otro caso muestra
+ * un bloqueo claro: nunca degrada silenciosamente.
  */
 export function AppServicesProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<BootState>({ phase: 'loading' });
@@ -61,7 +64,11 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
     async function boot() {
       try {
         const keys = new SecureStoreKeyProvider();
-        const opened = await openAppDatabase(DATABASE_NAME, keys);
+        const allowed = isUnencryptedDemoModeAllowed();
+        const opened = await openAppDatabase(
+          allowed ? DEMO_DATABASE_NAME : DATABASE_NAME,
+          keys,
+        );
         if (cancelled) return;
         const repository = new SqliteObservationRepository(opened.driver);
         const clock = new SystemClock();
@@ -73,21 +80,18 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
             registerDailyLog: new RegisterDailyLogUseCase(repository, identity, clock, ids),
             listRecentActivity: new ListRecentActivityUseCase(repository, clock),
           },
-          cipherVersion: opened.cipherVersion ?? 'unknown',
+          encrypted: opened.encrypted,
         });
       } catch (error) {
         if (cancelled) return;
-        if (error instanceof DatabaseEncryptionUnavailableError) {
-          setState({ phase: 'error', kind: 'encryption', message: error.message });
-        } else {
-          // Los mensajes de error no incluyen datos clínicos ni claves.
-          setState({
-            phase: 'error',
-            kind: 'encryption',
-            message:
-              'No se pudo abrir el almacenamiento cifrado. Revisa la compilación de la app.',
-          });
-        }
+        setState({
+          phase: 'error',
+          kind: 'encryption',
+          message:
+            error instanceof DatabaseEncryptionUnavailableError
+              ? error.message
+              : 'No se pudo abrir el almacenamiento. Revisa la compilación de la app.',
+        });
       } finally {
         SplashScreen.hideAsync().catch(() => undefined);
       }
@@ -108,8 +112,27 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppServicesContext.Provider value={state.services}>
-      {children}
+      <View style={styles.root}>
+        {!state.encrypted && <UnencryptedDemoBanner />}
+        <View style={styles.root}>{children}</View>
+      </View>
     </AppServicesContext.Provider>
+  );
+}
+
+/** Banner permanente: el modo sin cifrado nunca es silencioso. */
+function UnencryptedDemoBanner() {
+  return (
+    <View
+      accessible
+      accessibilityRole="alert"
+      accessibilityLabel="Modo demostración sin cifrado: almacenamiento no cifrado, solo datos de prueba."
+      style={styles.banner}
+    >
+      <Text style={styles.bannerText}>
+        Sin cifrado (Expo Go) — almacenamiento de prueba, no para datos reales.
+      </Text>
+    </View>
   );
 }
 
@@ -130,6 +153,18 @@ function StorageBlockedScreen({ message }: { message: string }) {
 }
 
 const styles = {
+  root: { flex: 1 },
+  banner: {
+    backgroundColor: palette.attention,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  bannerText: {
+    ...typography.small,
+    color: '#FFFFFF',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   blocked: {
     flex: 1,
     backgroundColor: palette.background,
