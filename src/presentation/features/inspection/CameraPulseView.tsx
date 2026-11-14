@@ -19,60 +19,92 @@ export interface CameraPulseViewProps {
   onSaved?: () => void;
 }
 
+const FINGER_RECOMMENDATIONS =
+  'Recomendaciones: 1) Cubre por completo la cámara trasera y el flash con la yema del dedo índice, sin dejar pasar luz. 2) Apoya el dedo con presión suave (no aprietes, puede cortar la circulación). 3) Mantén la mano quieta y apoyada durante toda la medición. 4) Si la piel está muy fría o hay poca perfusión, calienta la mano y vuelve a intentar. 5) Retira fundas gruesas o suciedad sobre la cámara/flash.';
+
 export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps) {
   const services = useAppServices();
   const cameraRef = useRef<CameraView>(null);
   const processor = useMemo(() => new PpgProcessor(), []);
 
   const [measuring, setMeasuring] = useState(false);
+  const [attempt, setAttempt] = useState<1 | 2 | null>(null);
+  const [torchEnabled, setTorchEnabled] = useState(false);
   const [progress, setProgress] = useState(0);
   const [fingerDetected, setFingerDetected] = useState(false);
   const [currentPulse, setCurrentPulse] = useState<PulseEstimate | null>(null);
   const [savedSuccess, setSavedSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [infoMsg, setInfoMsg] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [mountError, setMountError] = useState<string | null>(null);
   const samplesRef = useRef<PpgSample[]>([]);
   const captureFailuresRef = useRef(0);
 
-  // Muestreo controlado secuencial de luminancia con linterna activa
+  // Muestreo controlado secuencial de luminancia con linterna activa (con reintento automático)
   useEffect(() => {
-    if (!measuring) return;
+    if (!measuring || attempt === null) return;
 
     let cancelled = false;
     let timeout: ReturnType<typeof setTimeout> | null = null;
     const startTime = Date.now();
-    const targetDuration = 15000; // 15 segundos para acumular más muestras
+    const targetDuration = 15000; // 15 segundos por intento
+    samplesRef.current = [];
     captureFailuresRef.current = 0;
+
+    const finishAttempt = (finalEstimate: PulseEstimate | null, sampleCount: number) => {
+      const successful =
+        finalEstimate !== null && finalEstimate.bpm > 0 && finalEstimate.quality !== 'unreliable';
+
+      if (successful) {
+        setCurrentPulse(finalEstimate);
+        setMeasuring(false);
+        setAttempt(null);
+        setTorchEnabled(false);
+        setInfoMsg(null);
+        if (finalEstimate.quality === 'limited') {
+          setErrorMsg('Señal detectada con calidad limitada. Puedes repetir para mejorar la estimación.');
+        } else {
+          setErrorMsg(null);
+        }
+        return;
+      }
+
+      if (attempt === 1) {
+        // Reintento automático una vez: mantener linterna encendida
+        setCurrentPulse(null);
+        setProgress(0);
+        setFingerDetected(false);
+        setErrorMsg(null);
+        setSavedSuccess(null);
+        setInfoMsg('Primer intento sin señal clara. Reintentando automáticamente (intento 2/2)…');
+        setAttempt(2);
+        return;
+      }
+
+      // Segundo intento fallido: apagar linterna y dar recomendaciones
+      if (finalEstimate) setCurrentPulse(finalEstimate);
+      setMeasuring(false);
+      setAttempt(null);
+      setTorchEnabled(false);
+      setInfoMsg(null);
+      const base =
+        sampleCount < 8
+          ? `No se pudo obtener una señal suficiente tras 2 intentos (${sampleCount} muestras en el último intento).`
+          : `Se capturaron ${sampleCount} muestras en el último intento pero el patrón no fue concluyente tras 2 intentos.`;
+      setErrorMsg(`${base}\n\n${FINGER_RECOMMENDATIONS}`);
+    };
 
     const sampleOnce = async () => {
       if (cancelled) return;
       const elapsed = Date.now() - startTime;
-      const currentProgress = Math.min(100, Math.round((elapsed / targetDuration) * 100));
-      setProgress(currentProgress);
+      setProgress(Math.min(100, Math.round((elapsed / targetDuration) * 100)));
 
       if (elapsed >= targetDuration) {
-        setMeasuring(false);
         const count = samplesRef.current.length;
-        if (count < 8) {
-          setErrorMsg(
-            cameraReady
-              ? `Señal insuficiente (${count} muestras válidas). Cubre por completo la cámara trasera y el flash con la yema del dedo, mantén presión suave y evita moverte. Si la linterna no calienta/ilumina el dedo, prueba en un development build.`
-              : 'La cámara no estaba lista para la medición. Espera a que se active y vuelve a intentar.',
-          );
-        } else {
-          // Estimación final con lo obtenido
-          const est = processor.process(samplesRef.current);
-          setCurrentPulse(est);
-          if (est.bpm <= 0 || est.quality === 'unreliable') {
-            setErrorMsg(
-              `Se capturaron ${count} muestras pero el patrón periódico fue débil o poco concluyente. Ajusta la posición del dedo para que el flash ilumine la piel de forma uniforme y repite.`,
-            );
-          } else if (est.quality === 'limited') {
-            setErrorMsg('Señal detectada con calidad limitada. Puedes repetir para mejorar la estimación.');
-          }
-        }
+        const est = count >= 6 ? processor.process(samplesRef.current) : null;
+        finishAttempt(est, count);
         return;
       }
 
@@ -144,7 +176,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
       cancelled = true;
       if (timeout) clearTimeout(timeout);
     };
-  }, [measuring, processor, services.imageEncoder, cameraReady]);
+  }, [measuring, attempt, processor, services.imageEncoder, cameraReady]);
 
   const startMeasurement = useCallback(() => {
     if (!cameraReady) {
@@ -156,7 +188,10 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
     setCurrentPulse(null);
     setSavedSuccess(null);
     setErrorMsg(null);
+    setInfoMsg('Encendiendo linterna y midiendo (intento 1/2)…');
     setFingerDetected(false);
+    setTorchEnabled(true); // linterna automática al iniciar
+    setAttempt(1);
     setMeasuring(true);
   }, [cameraReady]);
 
@@ -203,7 +238,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
           ref={cameraRef}
           style={styles.camera}
           facing="back"
-          enableTorch
+          enableTorch={torchEnabled}
           animateShutter={false}
           onCameraReady={() => setCameraReady(true)}
           onMountError={(e) => {
@@ -232,13 +267,16 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
               <View style={styles.progressBarBg}>
                 <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
               </View>
-              <Text style={styles.progressLabel}>Midiendo pulsaciones… {progress}%</Text>
+              <Text style={styles.progressLabel}>
+                Midiendo pulsaciones… intento {attempt ?? 1}/2 · {progress}%
+              </Text>
             </View>
           )}
         </View>
       </View>
 
       {mountError ? <Text style={styles.errorText}>{mountError}</Text> : null}
+      {infoMsg && !mountError ? <Text style={styles.infoText}>{infoMsg}</Text> : null}
       {errorMsg && !mountError ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
       {/* Botón para iniciar / reiniciar medición */}
@@ -265,7 +303,11 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
       ) : (
         <View style={styles.measuringBox}>
           <ActivityIndicator color={palette.accent} />
-          <Text style={styles.measuringText}>Adquiriendo señal óptica con linterna…</Text>
+          <Text style={styles.measuringText}>
+            {attempt === 2
+              ? 'Reintentando… linterna activa y adquiriendo señal'
+              : 'Linterna activa: adquiriendo señal óptica…'}
+          </Text>
         </View>
       )}
 
@@ -540,6 +582,11 @@ const styles = StyleSheet.create({
   errorText: {
     ...typography.small,
     color: palette.priority,
+  },
+  infoText: {
+    ...typography.small,
+    color: palette.accent,
+    fontWeight: '600',
   },
   pressed: {
     opacity: 0.8,
