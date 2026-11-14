@@ -2,6 +2,7 @@ import type { SqlDriver } from '../driver';
 import { MIGRATION_V1_STATEMENTS, MIGRATION_V1_CATALOG_SQL } from './v001-initial';
 import { MIGRATION_V2_STATEMENTS } from './v002-sync';
 import { MIGRATION_V3_STATEMENTS } from './v003-lab-baselines-documents';
+import { MIGRATION_V4_STATEMENTS } from './v004-analysis-runs';
 import { METRIC_CATALOG_V1, METRIC_CATALOG_VERSION } from '@/domain/metrics/catalog-v1';
 
 export interface Migration {
@@ -56,6 +57,14 @@ export const MIGRATIONS: readonly Migration[] = [
     version: 3,
     async apply(driver) {
       for (const sql of MIGRATION_V3_STATEMENTS) {
+        await driver.exec(sql);
+      }
+    },
+  },
+  {
+    version: 4,
+    async apply(driver) {
+      for (const sql of MIGRATION_V4_STATEMENTS) {
         await driver.exec(sql);
       }
     },

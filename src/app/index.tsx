@@ -291,6 +291,15 @@ export default function HomeScreen() {
             <Text style={styles.linkTitle}>Linterna</Text>
             <Text style={styles.bodyText}>Inspección pupilar documentada.</Text>
           </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Registrar resultado hematológico"
+            onPress={() => router.push('/laboratorio')}
+            style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]}
+          >
+            <Text style={styles.linkTitle}>Laboratorio</Text>
+            <Text style={styles.bodyText}>Registrar resultado hematológico.</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </>

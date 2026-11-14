@@ -1,11 +1,13 @@
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect } from 'expo-router';
-import { cardStyle, palette, radius, spacing, typography } from '@/presentation/theme/tokens';
+import { PrimaryButton } from '@/presentation/components/screen';
+import { Card } from '@/presentation/components/ui';
 import { useAppServices } from './_providers';
 import { windowSummary, slopePerDay } from '@/domain/analytics/descriptive';
 import { evaluateEligibility } from '@/domain/analytics/eligibility';
 import type { SessionWithObservations } from '@/domain/repositories/observation-repository';
+import { palette, radius, spacing, typography, cardStyle } from '@/presentation/theme/tokens';
 
 const METRICS = [
   { id: 'heart_rate', name: 'Frecuencia cardíaca', unit: 'lpm' },
@@ -96,6 +98,9 @@ export default function AnalisisScreen() {
   const [stats, setStats] = useState<MetricStats[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [runs, setRuns] = useState<Record<string, string>>({});
+  const [running, setRunning] = useState(false);
+
   const load = useCallback(async () => {
     try {
       const sessions = await services.listRecentActivity.listRecentSessions(200);
@@ -105,6 +110,22 @@ export default function AnalisisScreen() {
       setError('No se pudieron leer los registros para el análisis.');
     }
   }, [services]);
+
+  const runAll = useCallback(async () => {
+    setRunning(true);
+    const newRuns: Record<string, string> = {};
+    for (const m of METRICS) {
+      try {
+        const r = await services.runTrendAnalysis.execute({ metricId: m.id, windowDays: 30 });
+        newRuns[m.id] = r.runId;
+      } catch {
+        newRuns[m.id] = 'error';
+      }
+    }
+    setRuns(newRuns);
+    setRunning(false);
+    await load();
+  }, [services, load]);
 
   useFocusEffect(
     useCallback(() => {
@@ -193,6 +214,28 @@ export default function AnalisisScreen() {
               )}
             </View>
           ))}
+
+        <Card title="Ejecutar análisis reproducible">
+          <Text style={styles.bodyText}>
+            Calcula la tendencia de cada métrica y guarda una ejecución
+            reproducible (corte, método, versión, observaciones usadas).
+          </Text>
+          <PrimaryButton
+            label={running ? 'Calculando…' : 'Calcular tendencias'}
+            onPress={() => void runAll()}
+            disabled={running}
+            busy={running}
+          />
+          {Object.keys(runs).length > 0 && (
+            <View style={{ gap: spacing.xs, marginTop: spacing.xs }}>
+              {METRICS.map((m) => (
+                <Text key={m.id} style={styles.hintText}>
+                  {m.name}: {runs[m.id] ?? '—'}
+                </Text>
+              ))}
+            </View>
+          )}
+        </Card>
 
         <View style={[cardStyle, styles.card]}>
           <Text style={styles.cardTitle}>Funciones pendientes (honestas)</Text>
