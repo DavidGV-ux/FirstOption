@@ -150,7 +150,8 @@ export class SyncNowUseCase {
     // observation
     const observationId = String(raw.observation_id ?? entityId);
     const sessionId = String(raw.session_id ?? '');
-    const metricId = String(raw.metric_id ?? raw.metric_code ?? 'unknown_metric');
+    const rawMetricId = String(raw.metric_id ?? raw.metric_code ?? 'unknown_metric');
+    const metricId = this.normalizeMetricCode(rawMetricId);
     const value = raw.value_original ?? raw.value_numeric ?? null;
     const numericValue =
       typeof value === 'number' ? value : value === null ? null : Number(value);
@@ -188,6 +189,14 @@ export class SyncNowUseCase {
         updated_at: measuredAt,
       },
     };
+  }
+
+  /** Normaliza códigos de métricas para compatibilidad con el catálogo remoto. */
+  private normalizeMetricCode(code: string): string {
+    const fixes: Record<string, string> = {
+      sympton_nausea: 'symptom_nausea',
+    };
+    return fixes[code] ?? code;
   }
 
   /** Convierte un identificador estable a UUID determinístico (v4-like en formato, derivado por hash). */
