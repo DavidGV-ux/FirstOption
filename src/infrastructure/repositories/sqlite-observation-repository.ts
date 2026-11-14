@@ -10,6 +10,7 @@ import type {
   ObservationRepository,
   SessionWithObservations,
 } from '@/domain/repositories/observation-repository';
+import type { OutboxRow, SyncOutboxStore } from '@/domain/repositories/sync-outbox';
 import type { MetricDefinition } from '@/domain/metrics/metric-definition';
 import type { SqlDriver } from '../database/driver';
 
@@ -106,8 +107,12 @@ function mapMetric(row: MetricRow): MetricDefinition {
 /**
  * Repositorio de observaciones sobre SQLite. SQL siempre parametrizado;
  * ninguna consulta concatena entradas de la persona usuaria.
+ *
+ * El guardado de una sesión escribe también las entradas de
+ * `sync_outbox` en la MISMA transacción (offline-first): guardar una
+ * medición y encolarla para sincronizar es una única operación atómica.
  */
-export class SqliteObservationRepository implements ObservationRepository {
+export class SqliteObservationRepository implements ObservationRepository, SyncOutboxStore {
   constructor(private readonly driver: SqlDriver) {}
 
   async saveSessionWithObservations(
@@ -156,8 +161,53 @@ export class SqliteObservationRepository implements ObservationRepository {
             createdAt,
           ],
         );
+        // Entrada de outbox (misma transacción, idempotente por entidad).
+        await this.enqueueOutbox(
+          'observation',
+          this.observationId(session.sessionId, obs),
+          {
+            observation_id: this.observationId(session.sessionId, obs),
+            session_id: session.sessionId,
+            metric_id: obs.metricId,
+            value_original: obs.valueOriginal,
+            unit_original: obs.unitOriginal,
+            observed_at: obs.observedAt,
+            local_date: obs.localDate,
+            quality_state: obs.qualityState ?? 'ok',
+            created_at: createdAt,
+          },
+          createdAt,
+        );
       }
+
+      // Encolar también la sesión.
+      await this.enqueueOutbox('measurement_session', session.sessionId, {
+        session_id: session.sessionId,
+        subject_id: session.subjectId,
+        mission_phase: session.missionPhase,
+        recorded_at: session.recordedAt,
+        recorded_local_date: session.recordedLocalDate,
+        source: session.source,
+        note: session.note,
+        created_at: session.createdAt,
+      }, createdAt);
     });
+  }
+
+  /** Inserta (o conserva) una entrada de outbox dentro de la transacción actual. */
+  private async enqueueOutbox(
+    entityType: 'measurement_session' | 'observation',
+    entityId: string,
+    payload: Record<string, unknown>,
+    createdAt: string,
+  ): Promise<void> {
+    await this.driver.run(
+      `INSERT INTO sync_outbox
+         (outbox_id, entity_type, entity_id, operation, payload, created_at, state)
+       VALUES (?, ?, ?, 'upsert', ?, ?, 'pending')
+       ON CONFLICT (entity_type, entity_id) DO NOTHING`,
+      [`${entityType}:${entityId}`, entityType, entityId, JSON.stringify(payload), createdAt],
+    );
   }
 
   /**
@@ -218,5 +268,68 @@ export class SqliteObservationRepository implements ObservationRepository {
       `SELECT * FROM metric_definitions ORDER BY category, metric_id`,
     );
     return rows.map(mapMetric);
+  }
+
+  // ------------------------------------------------------------------
+  // Outbox y cursores (Incremento 2)
+  // ------------------------------------------------------------------
+
+  /** Entradas pendientes o fallidas, más antiguas primero. */
+  async listPendingOutbox(limit = 200): Promise<OutboxRow[]> {
+    return this.driver.getAll<OutboxRow>(
+      `SELECT outbox_id, entity_type, entity_id, payload, attempts
+       FROM sync_outbox
+       WHERE state IN ('pending', 'failed')
+       ORDER BY created_at ASC
+       LIMIT ?`,
+      [Math.max(1, Math.floor(limit))],
+    );
+  }
+
+  async markOutboxDone(outboxId: string): Promise<void> {
+    await this.driver.run(
+      `UPDATE sync_outbox
+       SET state = 'done', last_attempt_at = ?, last_error = NULL
+       WHERE outbox_id = ?`,
+      [new Date().toISOString(), outboxId],
+    );
+  }
+
+  async markOutboxFailed(outboxId: string, error: string): Promise<void> {
+    const now = new Date().toISOString();
+    await this.driver.run(
+      `UPDATE sync_outbox
+       SET state = 'failed', attempts = attempts + 1,
+           last_attempt_at = ?, last_error = ?
+       WHERE outbox_id = ?`,
+      [now, error.slice(0, 500), outboxId],
+    );
+  }
+
+  /** Marca como sincronizadas las filas clínicas correspondientes. */
+  async markEntitiesSynced(entityType: 'measurement_session' | 'observation', entityId: string): Promise<void> {
+    const table = entityType === 'measurement_session' ? 'measurement_sessions' : 'observations';
+    const idColumn = entityType === 'measurement_session' ? 'session_id' : 'observation_id';
+    await this.driver.run(
+      `UPDATE ${table} SET sync_state = 'synced' WHERE ${idColumn} = ?`,
+      [entityId],
+    );
+  }
+
+  async getCursor(key: string): Promise<string | null> {
+    const row = await this.driver.getFirst<{ value: string }>(
+      'SELECT value FROM sync_cursors WHERE key = ?',
+      [key],
+    );
+    return row?.value ?? null;
+  }
+
+  async setCursor(key: string, value: string): Promise<void> {
+    await this.driver.run(
+      `INSERT INTO sync_cursors (key, value, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      [key, value, new Date().toISOString()],
+    );
   }
 }

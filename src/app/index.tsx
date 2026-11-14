@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import type { LatestLogStatus } from '@/application/use-cases/list-recent-activity';
+import type { SyncStatus } from '@/application/use-cases/sync-now';
 import { StatusChip } from '@/presentation/components/screen';
 import { useAppServices } from './providers';
 import { cardStyle, palette, radius, spacing, typography } from '@/presentation/theme/tokens';
@@ -34,6 +35,8 @@ export default function HomeScreen() {
   const [pending, setPending] = useState<{ sessions: number; observations: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [authState, setAuthState] = useState<'checking' | 'signed_in' | 'signed_out'>('checking');
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -46,6 +49,13 @@ export default function HomeScreen() {
       setError(null);
     } catch {
       setError('No se pudieron leer los registros locales. Inténtalo de nuevo.');
+    }
+    // Estado de sesión remota (sin red: sigue en signed_out pero honesto).
+    if (services.supabase !== null) {
+      const { data } = await services.supabase.auth.getSession();
+      setAuthState(data.session !== null ? 'signed_in' : 'signed_out');
+    } else {
+      setAuthState('signed_out');
     }
   }, [services]);
 
@@ -60,6 +70,38 @@ export default function HomeScreen() {
     await load();
     setRefreshing(false);
   }, [load]);
+
+  const syncNow = useCallback(async () => {
+    if (services.syncNow === null) {
+      setSyncMessage('Sincronización no disponible en esta compilación.');
+      return;
+    }
+    if (authState !== 'signed_in') {
+      setSyncMessage('Inicia sesión para sincronizar con el servidor.');
+      return;
+    }
+    setSyncMessage('Sincronizando…');
+    const result: SyncStatus = await services.syncNow.execute();
+    switch (result.kind) {
+      case 'synced':
+        setSyncMessage(
+          result.pushed === 0
+            ? 'Nada pendiente de sincronizar.'
+            : `Sincronizadas ${result.pushed} operación(es). Pendientes: ${result.remaining}.`,
+        );
+        break;
+      case 'not_authenticated':
+        setSyncMessage('La sesión remota expiró. Vuelve a iniciar sesión cuando haya internet.');
+        break;
+      case 'offline':
+        setSyncMessage('Sin conexión: los datos siguen guardados en el dispositivo.');
+        break;
+      case 'remote_error':
+        setSyncMessage(result.message);
+        break;
+    }
+    await load();
+  }, [services, authState, load]);
 
   const entry = status?.entry ?? null;
 
@@ -111,14 +153,44 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Estado de sincronización (Incremento 1: solo local) */}
+        {/* Estado de sincronización */}
         <View style={[cardStyle, styles.section]}>
           <Text style={styles.sectionTitle}>Sincronización</Text>
           <Text style={styles.bodyText}>
             {pending !== null && pending.sessions > 0
-              ? `${pending.sessions} registro(s) guardados solo en este dispositivo, aún sin sincronizar.`
+              ? `${pending.sessions} registro(s) guardados en este dispositivo, pendientes de sincronizar.`
               : 'Los registros se guardan cifrados en este dispositivo. La sincronización con el servidor aún no está implementada; este prototipo funciona sin conexión.'}
           </Text>
+          {services.remoteConfigured ? (
+            authState === 'signed_in' ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Sincronizar ahora con el servidor"
+                onPress={() => void syncNow()}
+                style={styles.syncButton}
+              >
+                <Text style={styles.syncButtonText}>Sincronizar ahora</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Iniciar sesión para sincronizar"
+                onPress={() => router.push('/acceso')}
+                style={styles.syncButton}
+              >
+                <Text style={styles.syncButtonText}>Iniciar sesión para sincronizar</Text>
+              </Pressable>
+            )
+          ) : (
+            <Text style={styles.hintText}>
+              Sincronización no configurada en esta compilación.
+            </Text>
+          )}
+          {syncMessage !== null && (
+            <Text style={styles.syncStatusText} accessibilityRole="status">
+              {syncMessage}
+            </Text>
+          )}
         </View>
 
         {/* Tareas pendientes: registro de hoy */}
@@ -171,6 +243,18 @@ const styles = StyleSheet.create({
   linkTitle: { ...typography.subtitle, color: palette.accent, marginBottom: spacing.xs },
   pressed: { opacity: 0.8 },
   ctaSpace: { height: spacing.xl },
+  syncButton: {
+    alignSelf: 'flex-start',
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.accent,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  syncButtonText: { ...typography.secondary, color: palette.accent, fontWeight: '600' },
+  syncStatusText: { ...typography.small, color: palette.textSecondary, marginTop: spacing.xs },
+  hintText: { ...typography.small, color: palette.textSecondary, marginTop: spacing.xs },
   errorBox: {
     backgroundColor: 'rgba(163,52,58,0.08)',
     borderRadius: radius.sm,

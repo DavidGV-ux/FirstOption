@@ -35,7 +35,9 @@ create index if not exists idx_sessions_subject_time
 -- value_original es el dato de procedencia: NUNCA se sobrescribe.
 -- ---------------------------------------------------------------------------
 create table if not exists public.observations (
-  observation_id uuid primary key,                   -- generado en cliente
+  -- texto determinista generado en el cliente (sessionId:metricId):
+  -- permite idempotencia exacta en reintentos de sincronización.
+  observation_id text primary key,
   session_id uuid not null references public.measurement_sessions (session_id)
     on delete cascade,
   metric_id text not null references public.metric_definitions (metric_id),

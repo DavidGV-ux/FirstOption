@@ -20,6 +20,7 @@ export default function RootLayout() {
           options={{ title: 'Registrar seguimiento' }}
         />
         <Stack.Screen name="historial" options={{ title: 'Historial' }} />
+        <Stack.Screen name="acceso" options={{ title: 'Acceso' }} />
       </Stack>
     </AppServicesProvider>
   );

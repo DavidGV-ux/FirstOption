@@ -77,7 +77,7 @@ create index if not exists idx_runs_subject_metric
 create table if not exists public.analysis_input_observations (
   analysis_run_id uuid not null references public.analysis_runs (analysis_run_id)
     on delete cascade,
-  observation_id uuid not null references public.observations (observation_id),
+  observation_id text not null references public.observations (observation_id),
   used_as text not null default 'input'
     check (used_as in ('input','excluded_outlier','excluded_quality')),
   primary key (analysis_run_id, observation_id)

@@ -1,5 +1,6 @@
 import type { SqlDriver } from '../driver';
 import { MIGRATION_V1_STATEMENTS, MIGRATION_V1_CATALOG_SQL } from './v001-initial';
+import { MIGRATION_V2_STATEMENTS } from './v002-sync';
 import { METRIC_CATALOG_V1, METRIC_CATALOG_VERSION } from '@/domain/metrics/catalog-v1';
 
 export interface Migration {
@@ -40,6 +41,14 @@ export const MIGRATIONS: readonly Migration[] = [
           'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
         [String(METRIC_CATALOG_VERSION)],
       );
+    },
+  },
+  {
+    version: 2,
+    async apply(driver) {
+      for (const sql of MIGRATION_V2_STATEMENTS) {
+        await driver.exec(sql);
+      }
     },
   },
 ];

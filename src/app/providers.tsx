@@ -7,10 +7,12 @@ import {
 } from 'react';
 import { Text, View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   RegisterDailyLogUseCase,
 } from '@/application/use-cases/register-daily-log';
 import { ListRecentActivityUseCase } from '@/application/use-cases/list-recent-activity';
+import { SyncNowUseCase } from '@/application/use-cases/sync-now';
 import { SqliteObservationRepository } from '@/infrastructure/repositories/sqlite-observation-repository';
 import {
   openAppDatabase,
@@ -18,9 +20,16 @@ import {
   isUnencryptedDemoModeAllowed,
 } from '@/infrastructure/database/open-database';
 import { SecureStoreKeyProvider } from '@/infrastructure/security/db-key-store';
-import { LocalSubjectIdentity } from '@/infrastructure/security/local-subject-identity';
+import {
+  LocalSubjectIdentity,
+  type RemoteSubjectProvider,
+} from '@/infrastructure/security/local-subject-identity';
 import { CryptoIdGenerator } from '@/infrastructure/ids/uuid-generator';
 import { SystemClock } from '@/infrastructure/clock/system-clock';
+import {
+  getSupabaseClient,
+  isSupabaseConfigured,
+} from '@/infrastructure/supabase/client';
 import { palette, spacing, typography } from '@/presentation/theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -28,11 +37,15 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 });
 
 const DATABASE_NAME = 'orbita_salud.db';
-const DEMO_DATABASE_NAME = 'orbita_salud_demo.db';
+const EXPO_GO_DATABASE_NAME = 'orbita_salud_local.db';
 
 interface AppServices {
   registerDailyLog: RegisterDailyLogUseCase;
   listRecentActivity: ListRecentActivityUseCase;
+  syncNow: SyncNowUseCase | null;
+  supabase: SupabaseClient | null;
+  /** true si Supabase está configurado por variables de entorno. */
+  remoteConfigured: boolean;
 }
 
 const AppServicesContext = createContext<AppServices | null>(null);
@@ -66,19 +79,39 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
         const keys = new SecureStoreKeyProvider();
         const allowed = isUnencryptedDemoModeAllowed();
         const opened = await openAppDatabase(
-          allowed ? DEMO_DATABASE_NAME : DATABASE_NAME,
+          allowed ? EXPO_GO_DATABASE_NAME : DATABASE_NAME,
           keys,
         );
         if (cancelled) return;
         const repository = new SqliteObservationRepository(opened.driver);
         const clock = new SystemClock();
         const ids = new CryptoIdGenerator();
-        const identity = new LocalSubjectIdentity(opened.driver);
+        let supabase: SupabaseClient | null = null;
+        if (isSupabaseConfigured()) {
+          try {
+            supabase = getSupabaseClient();
+          } catch {
+            supabase = null;
+          }
+        }
+        const remoteSubject: RemoteSubjectProvider | null =
+          supabase === null
+            ? null
+            : {
+                async getUserId() {
+                  const { data } = await supabase!.auth.getSession();
+                  return data.session?.user?.id ?? null;
+                },
+              };
+        const identity = new LocalSubjectIdentity(opened.driver, remoteSubject);
         setState({
           phase: 'ready',
           services: {
             registerDailyLog: new RegisterDailyLogUseCase(repository, identity, clock, ids),
             listRecentActivity: new ListRecentActivityUseCase(repository, clock),
+            syncNow: supabase !== null ? new SyncNowUseCase(supabase, repository) : null,
+            supabase,
+            remoteConfigured: supabase !== null,
           },
           encrypted: opened.encrypted,
         });
@@ -113,7 +146,7 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
   return (
     <AppServicesContext.Provider value={state.services}>
       <View style={styles.root}>
-        {!state.encrypted && <UnencryptedDemoBanner />}
+        {!state.encrypted && <UnencryptedModeBanner />}
         <View style={styles.root}>{children}</View>
       </View>
     </AppServicesContext.Provider>
@@ -121,16 +154,16 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
 }
 
 /** Banner permanente: el modo sin cifrado nunca es silencioso. */
-function UnencryptedDemoBanner() {
+function UnencryptedModeBanner() {
   return (
     <View
       accessible
       accessibilityRole="alert"
-      accessibilityLabel="Modo demostración sin cifrado: almacenamiento no cifrado, solo datos de prueba."
+      accessibilityLabel="Modo Expo Go: los datos se guardan sin cifrado en este dispositivo. Para cifrado, usa el development build."
       style={styles.banner}
     >
       <Text style={styles.bannerText}>
-        Sin cifrado (Expo Go) — almacenamiento de prueba, no para datos reales.
+        Modo Expo Go: datos guardados sin cifrado en este dispositivo.
       </Text>
     </View>
   );

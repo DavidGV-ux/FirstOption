@@ -29,17 +29,13 @@ export interface OpenedDatabase {
 }
 
 /**
- * El modo sin cifrado es EXPLÍCITO y doblemente condicionado:
- * 1) EXPO_PUBLIC_ALLOW_UNENCRYPTED_DB=1 (intención declarada) y
- * 2) EXPO_PUBLIC_DATA_MODE=demo (solo datos de prueba).
- * Además usa un archivo de base distinto para no mezclar nunca datos
- * de una base cifrada con una sin cifrar.
+ * Modo Expo Go: SQLite plano sin cifrar (Expo Go no incluye SQLCipher).
+ * Es EXPLÍCITO y condicionado: EXPO_PUBLIC_ALLOW_UNENCRYPTED_DB=1.
+ * Usa un archivo distinto para no mezclar datos de una base cifrada
+ * con una sin cifrar, y la UI muestra un aviso factual permanente.
  */
 export function isUnencryptedDemoModeAllowed(): boolean {
-  return (
-    process.env.EXPO_PUBLIC_ALLOW_UNENCRYPTED_DB === '1' &&
-    process.env.EXPO_PUBLIC_DATA_MODE === 'demo'
-  );
+  return process.env.EXPO_PUBLIC_ALLOW_UNENCRYPTED_DB === '1';
 }
 
 /**
@@ -69,7 +65,7 @@ export async function openAppDatabase(
       }
       throw new DatabaseEncryptionUnavailableError();
     }
-    // Modo de prueba explícito: base separada, sin clave, banner visible.
+    // Modo Expo Go explícito: base separada, sin clave, aviso visible.
     const driver: SqlDriver = new ExpoSqlDriver(db);
     const schemaVersion = await migrateIfNeeded(driver);
     return { driver, schemaVersion, cipherVersion: null, encrypted: false };
