@@ -36,9 +36,9 @@ export class PpgProcessor {
     const tEnd = sorted[sorted.length - 1].timestampMs;
     const durationSec = Math.max(0.1, (tEnd - t0) / 1000);
 
-    // Muestreo uniforme (mayor resolución temporal para interpolar pocas muestras)
+    // Muestreo uniforme (interpolación densa incluso con pocas muestras reales)
     const fs = 30;
-    const n = Math.min(1200, Math.max(90, Math.floor(Math.max(durationSec, 5) * fs)));
+    const n = Math.min(1500, Math.max(120, Math.floor(Math.max(durationSec, 6) * fs)));
 
     // Probar varios canales/señales y quedarnos con el pico espectral más claro
     const channelGetters: ((s: PpgSample) => number)[] = [
@@ -100,14 +100,14 @@ export class PpgProcessor {
       const std = Math.sqrt(variance) || 1;
       for (let i = 0; i < n; i++) centered[i] /= std;
 
-      // DFT en banda cardíaca amplia: 0.6 Hz (36 BPM) a 3.8 Hz (228 BPM)
+      // DFT en banda cardíaca amplia: 0.55 Hz (33 BPM) a 4.0 Hz (240 BPM)
       let bestFrequency = 1.2;
       let bestPower = 0.0;
       let totalPower = 0.0;
       const spectralPowers: { freq: number; power: number }[] = [];
-      const minFreq = 0.6;
-      const maxFreq = 3.8;
-      const freqStep = 0.015;
+      const minFreq = 0.55;
+      const maxFreq = 4.0;
+      const freqStep = 0.01;
 
       for (let freq = minFreq; freq <= maxFreq; freq += freqStep) {
         let real = 0.0;
@@ -131,13 +131,13 @@ export class PpgProcessor {
 
       let coherentPeakPower = 0.0;
       for (const item of spectralPowers) {
-        if (Math.abs(item.freq - bestFrequency) <= 0.18) {
+        if (Math.abs(item.freq - bestFrequency) <= 0.22) {
           coherentPeakPower += item.power;
         }
       }
       const rawSqi = totalPower > 0 ? coherentPeakPower / totalPower : 0;
-      // Hacer SQI más generoso con señales débiles pero periódicas
-      const sqi = Math.max(0.0, Math.min(1.0, Math.pow(rawSqi, 0.7) * 1.1));
+      // SQI generoso para señales débiles pero periódicas (linternas poco potentes)
+      const sqi = Math.max(0.0, Math.min(1.0, Math.pow(rawSqi, 0.6) * 1.25));
 
       if (!best || bestPower > best.power) {
         best = { bpm: bestFrequency * 60.0, sqi, power: bestPower };

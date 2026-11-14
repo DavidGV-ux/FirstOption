@@ -28,7 +28,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
   const processor = useMemo(() => new PpgProcessor(), []);
 
   const [measuring, setMeasuring] = useState(false);
-  const [attempt, setAttempt] = useState<1 | 2 | null>(null);
+  const [attempt, setAttempt] = useState<1 | 2 | 3 | null>(null);
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [progress, setProgress] = useState(0);
   const [fingerDetected, setFingerDetected] = useState(false);
@@ -42,19 +42,19 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
   const samplesRef = useRef<PpgSample[]>([]);
   const captureFailuresRef = useRef(0);
 
-  // Muestreo controlado secuencial de luminancia con linterna activa (con reintento automático)
+  // Muestreo controlado secuencial de luminancia con linterna activa (con reintentos automáticos)
   useEffect(() => {
     if (!measuring || attempt === null) return;
 
     let cancelled = false;
     let timeout: ReturnType<typeof setTimeout> | null = null;
     const startTime = Date.now();
-    const targetDuration = 15000; // 15 segundos por intento
+    const targetDuration = 20000; // 20 segundos por intento para acumular más muestras
     samplesRef.current = [];
     captureFailuresRef.current = 0;
 
     const finishAttempt = (finalEstimate: PulseEstimate | null, sampleCount: number) => {
-      // Éxito: cualquier lectura con pulso detectado (incluso limitada, dada la variabilidad de linternas)
+      // Éxito: cualquier lectura con pulso detectado (incluso con baja confianza)
       const successful = finalEstimate !== null && finalEstimate.bpm > 0;
 
       if (successful) {
@@ -65,7 +65,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
         setInfoMsg(null);
         if (finalEstimate.quality === 'unreliable' || finalEstimate.quality === 'limited') {
           setErrorMsg(
-            'Señal detectada pero de calidad limitada (linterna/sensor variables). Mantén el dedo firme y repite si quieres mayor confianza.',
+            'Señal detectada (calidad limitada por linterna/sensor). Mantén el dedo firme y repite si quieres mayor confianza.',
           );
         } else {
           setErrorMsg(null);
@@ -73,28 +73,29 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
         return;
       }
 
-      if (attempt === 1) {
-        // Reintento automático una vez: mantener linterna encendida
+      if (attempt === 1 || attempt === 2) {
+        // Reintentos automáticos: mantener linterna encendida
+        const next = (attempt + 1) as 2 | 3;
         setCurrentPulse(null);
         setProgress(0);
         setFingerDetected(false);
         setErrorMsg(null);
         setSavedSuccess(null);
-        setInfoMsg('Primer intento sin señal clara. Reintentando automáticamente (intento 2/2)…');
-        setAttempt(2);
+        setInfoMsg(`Intento ${attempt} sin señal clara. Reintentando automáticamente (intento ${next}/3)…`);
+        setAttempt(next);
         return;
       }
 
-      // Segundo intento fallido: apagar linterna y dar recomendaciones
+      // Último intento fallido: apagar linterna y dar recomendaciones
       if (finalEstimate) setCurrentPulse(finalEstimate);
       setMeasuring(false);
       setAttempt(null);
       setTorchEnabled(false);
       setInfoMsg(null);
       const base =
-        sampleCount < 4
-          ? `No se pudo obtener una señal suficiente tras 2 intentos (${sampleCount} muestras en el último intento).`
-          : `Se capturaron ${sampleCount} muestras en el último intento pero no se identificó un pulso claro tras 2 intentos.`;
+        sampleCount < 3
+          ? `No se pudo obtener una señal suficiente tras 3 intentos (${sampleCount} muestras en el último intento).`
+          : `Se capturaron ${sampleCount} muestras en el último intento pero no se identificó un pulso claro tras 3 intentos.`;
       setErrorMsg(`${base}\n\n${FINGER_RECOMMENDATIONS}`);
     };
 
@@ -105,7 +106,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
 
       if (elapsed >= targetDuration) {
         const count = samplesRef.current.length;
-        const est = count >= 4 ? processor.process(samplesRef.current) : null;
+        const est = count >= 3 ? processor.process(samplesRef.current) : null;
         finishAttempt(est, count);
         return;
       }
@@ -113,10 +114,11 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
       if (cameraRef.current && cameraReady) {
         try {
           const pic = await cameraRef.current.takePictureAsync({
-            quality: 0.25,
+            quality: 0.05,
             base64: true,
             shutterSound: false,
             exif: false,
+            skipProcessing: true,
           });
 
           if (pic?.base64) {
@@ -127,7 +129,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
               let bSum = 0;
               const total = decoded.width * decoded.height;
               // Submuestreo agresivo para procesar rápido y permitir más capturas
-              const step = Math.max(1, Math.floor(total / 300));
+              const step = Math.max(1, Math.floor(total / 120));
               let pxCount = 0;
 
               for (let i = 0; i < total; i += step) {
@@ -149,7 +151,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
                 setFingerDetected(processor.isFingerDetected(sample));
                 samplesRef.current = [...samplesRef.current, sample];
                 // Procesar temprano y con frecuencia para converger rápido
-                if (samplesRef.current.length >= 4) {
+                if (samplesRef.current.length >= 3) {
                   const est = processor.process(samplesRef.current);
                   setCurrentPulse(est);
                 }
@@ -166,10 +168,10 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
       }
 
       if (!cancelled) {
-        // Intervalo corto para maximizar muestras (limitado por takePictureAsync)
+        // Encadenar lo más rápido posible (el límite real es takePictureAsync/decodificación)
         timeout = setTimeout(() => {
           void sampleOnce();
-        }, 120);
+        }, 0);
       }
     };
 
@@ -193,7 +195,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
     setCurrentPulse(null);
     setSavedSuccess(null);
     setErrorMsg(null);
-    setInfoMsg('Encendiendo linterna y midiendo (intento 1/2)…');
+    setInfoMsg('Encendiendo linterna y midiendo (intento 1/3)…');
     setFingerDetected(false);
     setTorchEnabled(true); // linterna automática al iniciar
     setAttempt(1);
@@ -273,7 +275,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
                 <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
               </View>
               <Text style={styles.progressLabel}>
-                Midiendo pulsaciones… intento {attempt ?? 1}/2 · {progress}%
+                Midiendo pulsaciones… intento {attempt ?? 1}/3 · {progress}%
               </Text>
             </View>
           )}
@@ -309,8 +311,8 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
         <View style={styles.measuringBox}>
           <ActivityIndicator color={palette.accent} />
           <Text style={styles.measuringText}>
-            {attempt === 2
-              ? 'Reintentando… linterna activa y adquiriendo señal'
+            {attempt && attempt > 1
+              ? `Reintentando (intento ${attempt}/3)… linterna activa y adquiriendo señal`
               : 'Linterna activa: adquiriendo señal óptica…'}
           </Text>
         </View>
