@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ValidationError } from '@/domain/shared/validation-error';
 
 /**
  * Esquema de entrada del registro diario (Incremento 1).
@@ -138,14 +139,7 @@ export const dailyLogInputSchema = z
 export type DailyLogInput = z.infer<typeof dailyLogInputSchema>;
 
 /** Error de validación de entrada; el mensaje es para la persona usuaria. */
-export class ValidationError extends Error {
-  readonly fieldErrors: Record<string, string>;
-  constructor(fieldErrors: Record<string, string>) {
-    super('Entrada inválida');
-    this.name = 'ValidationError';
-    this.fieldErrors = fieldErrors;
-  }
-}
+export { ValidationError };
 
 /** Parsea y normaliza la entrada; lanza ValidationError con mensajes en español. */
 export function parseDailyLogInput(raw: unknown): DailyLogInput {
