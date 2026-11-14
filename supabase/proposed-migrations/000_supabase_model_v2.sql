@@ -223,7 +223,7 @@ create table if not exists public.unit_conversions (
   to_unit text not null,
 
   multiplier numeric not null,
-  offset numeric not null default 0,
+  "offset" numeric not null default 0,
 
   valid_from timestamptz
     not null default now(),
