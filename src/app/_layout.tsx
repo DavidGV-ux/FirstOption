@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { AppServicesProvider } from './providers';
+import { AppServicesProvider } from './_providers';
 import { palette } from '@/presentation/theme/tokens';
 
 export default function RootLayout() {

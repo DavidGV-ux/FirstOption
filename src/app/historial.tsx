@@ -4,7 +4,7 @@ import { Stack, useFocusEffect } from 'expo-router';
 import type { RecentLogEntry } from '@/application/use-cases/list-recent-activity';
 import { EmptyState, StatusChip } from '@/presentation/components/screen';
 import { cardStyle, palette, spacing, typography } from '@/presentation/theme/tokens';
-import { useAppServices } from './providers';
+import { useAppServices } from './_providers';
 
 const PHASE_LABELS: Record<string, string> = {
   preflight: 'Preflight',

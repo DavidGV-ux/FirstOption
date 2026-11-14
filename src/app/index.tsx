@@ -4,7 +4,7 @@ import { router, Stack, useFocusEffect } from 'expo-router';
 import type { LatestLogStatus } from '@/application/use-cases/list-recent-activity';
 import type { SyncStatus } from '@/application/use-cases/sync-now';
 import { StatusChip } from '@/presentation/components/screen';
-import { useAppServices } from './providers';
+import { useAppServices } from './_providers';
 import { cardStyle, palette, radius, spacing, typography } from '@/presentation/theme/tokens';
 
 const PHASE_LABELS: Record<string, string> = {

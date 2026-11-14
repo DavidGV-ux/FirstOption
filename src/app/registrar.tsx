@@ -12,7 +12,7 @@ import { MISSION_PHASES, MISSION_PHASE_LABELS_ES } from '@/domain/observations/o
 import { PrimaryButton, FormError } from '@/presentation/components/screen';
 import { REGISTER_SCALES, REGISTER_SYMPTOMS } from '@/presentation/features/register/scale-config';
 import { cardStyle, palette, radius, spacing, typography } from '@/presentation/theme/tokens';
-import { useAppServices } from './providers';
+import { useAppServices } from './_providers';
 
 type FormValues = DailyLogInput;
 

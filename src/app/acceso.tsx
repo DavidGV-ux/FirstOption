@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { router, Stack } from 'expo-router';
 import { FormError, PrimaryButton } from '@/presentation/components/screen';
 import { cardStyle, palette, spacing, typography } from '@/presentation/theme/tokens';
-import { useAppServices } from './providers';
+import { useAppServices } from './_providers';
 
 /**
  * Acceso con Supabase Auth (email + contraseña).

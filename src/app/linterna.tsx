@@ -19,7 +19,7 @@ import type { VisualDisturbanceAnswer } from '@/domain/observations/inspection-s
 import { ValidationError } from '@/domain/observations/daily-log-schema';
 import { FormError, PrimaryButton } from '@/presentation/components/screen';
 import { cardStyle, palette, radius, spacing, typography } from '@/presentation/theme/tokens';
-import { useAppServices } from './providers';
+import { useAppServices } from './_providers';
 
 const DISTURBANCE_LABELS: Record<VisualDisturbanceAnswer, string> = {
   si: 'Sí: alteración visual',
