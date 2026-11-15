@@ -66,8 +66,14 @@ class NodeSqlDriver {
 const { MIGRATION_V1_STATEMENTS, MIGRATION_V1_CATALOG_SQL } = await import(
   '../../src/infrastructure/database/migrations/v001-initial.ts'
 );
+const { MIGRATION_V2_STATEMENTS } = await import(
+  '../../src/infrastructure/database/migrations/v002-sync.ts'
+);
 const { MIGRATION_V6_STATEMENTS } = await import(
   '../../src/infrastructure/database/migrations/v006-camera-inspection.ts'
+);
+const { MIGRATION_V7_STATEMENTS } = await import(
+  '../../src/infrastructure/database/migrations/v007-fix-symptom-nausea-code.ts'
 );
 const { METRIC_CATALOG_V1, METRIC_CATALOG_VERSION } = await import(
   '../../src/domain/metrics/catalog-v1.ts'
@@ -364,3 +370,64 @@ test('migración v6: crea las tablas de inspección asistida por cámara e integ
   );
   assert.equal(remainingMetrics?.n, 0);
 });
+
+test('migración v7: corrige symptom_nauseas en observaciones legacy y outbox de forma idempotente sin perder datos', async () => {
+  await applyMigrations(driver);
+  for (const sql of MIGRATION_V2_STATEMENTS) await driver.exec(sql);
+
+  // Simula estado legado inconsistente (p.ej. FK no aplicada/catálogo antiguo): se desactiva FK solo para insertar.
+  await driver.exec('PRAGMA foreign_keys = OFF');
+  await driver.run(
+    `INSERT INTO measurement_sessions
+       (session_id, subject_id, mission_phase, recorded_at, recorded_local_date,
+        source, note, sync_state, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['ses-n', 'subj-1', 'inflight', '2026-11-14T12:00:00.000Z', '2026-11-14', 'manual_entry', null, 'sync_failed', '2026-11-14T12:00:00.000Z'],
+  );
+  await driver.run(
+    `INSERT INTO observations
+       (observation_id, session_id, metric_id, value_original, unit_original,
+        value_normalized, unit_normalized, observed_at, local_date,
+        quality_state, sync_state, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['ses-n:symptom_nauseas', 'ses-n', 'symptom_nauseas', 1, null, null, null, '2026-11-14T11:00:00.000Z', '2026-11-14', 'ok', 'sync_failed', '2026-11-14T12:00:00.000Z'],
+  );
+  await driver.exec('PRAGMA foreign_keys = ON');
+
+  await driver.run(
+    `INSERT INTO sync_outbox
+       (outbox_id, entity_type, entity_id, operation, payload, created_at, attempts, last_error, state)
+     VALUES (?, 'observation', ?, 'upsert', ?, '2026-11-14T12:00:00.000Z', 2, 'métrica inactiva o desconocida: symptom_nauseas', 'failed')`,
+    [
+      'observation:ses-n:symptom_nauseas',
+      'ses-n:symptom_nauseas',
+      JSON.stringify({ observation_id: 'ses-n:symptom_nauseas', session_id: 'ses-n', metric_id: 'symptom_nauseas', value_original: 1 }),
+    ],
+  );
+
+  for (const sql of MIGRATION_V7_STATEMENTS) await driver.exec(sql);
+  // idempotencia: segunda ejecución
+  for (const sql of MIGRATION_V7_STATEMENTS) await driver.exec(sql);
+
+  const obs = await driver.getFirst<{ metric_id: string; observation_id: string }>(
+    'SELECT observation_id, metric_id FROM observations WHERE observation_id = ?',
+    ['ses-n:symptom_nauseas'],
+  );
+  assert.equal(obs?.observation_id, 'ses-n:symptom_nauseas');
+  assert.equal(obs?.metric_id, 'symptom_nausea');
+
+  const outbox = await driver.getFirst<{ payload: string; state: string; last_error: string | null; attempts: number }>(
+    'SELECT payload, state, last_error, attempts FROM sync_outbox WHERE outbox_id = ?',
+    ['observation:ses-n:symptom_nauseas'],
+  );
+  assert.ok(outbox);
+  assert.equal(outbox.state, 'pending');
+  assert.equal(outbox.last_error, null);
+  assert.equal(outbox.attempts, 2); // no se reinician intentos
+  assert.match(outbox.payload, /"metric_id":"symptom_nausea"/);
+  assert.doesNotMatch(outbox.payload, /symptom_nauseas/);
+
+  const count = await driver.getFirst<{ n: number }>('SELECT COUNT(*) AS n FROM observations');
+  assert.equal(count?.n, 1);
+});
+

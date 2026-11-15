@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { FormError, PrimaryButton } from '@/presentation/components/screen';
 import { cardStyle, palette, spacing, typography } from '@/presentation/theme/tokens';
 import { useAppServices } from './_providers';
+
+const DISPLAY_NAME_KEY = 'firstOption_display_name';
 
 /**
  * Acceso con Supabase Auth (email + contraseña).
@@ -13,15 +16,27 @@ import { useAppServices } from './_providers';
  *   datos locales siguen funcionando igual.
  * - El registro crea el perfil remoto vía trigger; no se piden datos
  *   clínicos aquí.
+ * - Al crear cuenta se pide un nombre para mostrar ("¿Cómo quieres que
+ *   te llamamos?") que se guarda en el perfil y se usa en el inicio.
  */
 export default function AccessScreen() {
   const services = useAppServices();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  /** Guarda el nombre para mostrar localmente (para usarlo sin red). */
+  const saveDisplayNameLocally = useCallback(async (name: string) => {
+    try {
+      await SecureStore.setItemAsync(DISPLAY_NAME_KEY, name);
+    } catch {
+      // Ignorar si SecureStore no está disponible.
+    }
+  }, []);
 
   const submit = async () => {
     setBusy(true);
@@ -46,10 +61,32 @@ export default function AccessScreen() {
         const { error: signUpError, data } = await services.supabase.auth.signUp({
           email: email.trim(),
           password,
+          options: {
+            data: {
+              display_name: displayName.trim() || null,
+            },
+          },
         });
         if (signUpError !== null) {
           setError(mensajeAuth(signUpError.message));
           return;
+        }
+        // Guardar el nombre para mostrar localmente (funciona sin red).
+        await saveDisplayNameLocally(displayName.trim());
+        // Guardar en el perfil remoto de Supabase (tabla profiles).
+        if (services.supabase !== null && data.user?.id) {
+          try {
+            await services.supabase
+              .from('profiles')
+              .upsert({
+                id: data.user.id,
+                display_name: displayName.trim() || null,
+                updated_at: new Date().toISOString(),
+              })
+              .select();
+          } catch {
+            // No bloquear si falla el perfil remoto; el local ya se guardó.
+          }
         }
         if (data.session !== null) {
           router.back();
@@ -78,6 +115,25 @@ export default function AccessScreen() {
             La cuenta permite sincronizar con el servidor cuando haya
             internet. Sin conexión, el registro local sigue funcionando.
           </Text>
+          {mode === 'signup' && (
+            <>
+              <Text style={styles.fieldLabel}>¿Cómo quieres que te llamamos?</Text>
+              <TextInput
+                style={styles.input}
+                autoCapitalize="words"
+                autoComplete="name"
+                value={displayName}
+                onChangeText={setDisplayName}
+                placeholder="Tu nombre"
+                placeholderTextColor={palette.textSecondary}
+                accessibilityLabel="Nombre para mostrar"
+              />
+              <Text style={styles.fieldHelp}>
+                Este nombre aparecerá en el inicio de la app. Puedes dejarlo
+                vacío si prefieres usar tu correo.
+              </Text>
+            </>
+          )}
           <TextInput
             style={styles.input}
             autoCapitalize="none"
@@ -156,6 +212,8 @@ const styles = StyleSheet.create({
   gap: { gap: spacing.md },
   title: { ...typography.title, color: palette.textPrimary },
   help: { ...typography.secondary, color: palette.textSecondary },
+  fieldLabel: { ...typography.secondary, color: palette.textPrimary, fontWeight: '600', marginBottom: 4 },
+  fieldHelp: { ...typography.small, color: palette.textSecondary, marginBottom: spacing.sm },
   input: {
     backgroundColor: palette.surface,
     borderRadius: 6,

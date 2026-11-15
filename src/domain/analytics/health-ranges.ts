@@ -87,11 +87,11 @@ const INFORMATIVE_RANGES: Record<string, InformativeRange> = {
 
 export function statusColor(status: RangeStatus): string {
   switch (status) {
-    case 'aceptable': return '#2F6F4E';
-    case 'atencion': return '#8A5A17';
-    case 'negativo': return '#A3343A';
-    case 'informativo': return '#356D78';
-    default: return '#526371';
+    case 'aceptable': return '#45C58A';
+    case 'atencion': return '#F0B84B';
+    case 'negativo': return '#E87979';
+    case 'informativo': return '#4B91F1';
+    default: return '#9BA5B3';
   }
 }
 

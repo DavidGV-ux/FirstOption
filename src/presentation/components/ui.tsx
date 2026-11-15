@@ -1,7 +1,7 @@
 import { Pressable, Text, View, type ViewStyle } from 'react-native';
 import { palette, radius, spacing, typography } from '@/presentation/theme/tokens';
 
-/** Superficie blanca con título, contenido y acciones. */
+/** Superficie con título, contenido y acciones. */
 export function Card({
   title,
   children,
@@ -16,7 +16,7 @@ export function Card({
       style={[
         {
           backgroundColor: palette.surface,
-          borderRadius: radius.md,
+          borderRadius: radius.lg,
           borderWidth: 1,
           borderColor: palette.border,
           padding: spacing.md,
@@ -53,19 +53,20 @@ export function SecondaryButton({
       onPress={onPress}
       style={({ pressed }) => [
         {
-          minHeight: 48,
-          borderRadius: radius.sm,
+          minHeight: 44,
+          borderRadius: 14,
           borderWidth: 1,
           borderColor: palette.accent,
           paddingHorizontal: spacing.md,
           paddingVertical: spacing.sm,
           alignItems: 'center',
           justifyContent: 'center',
-          opacity: disabled ? 0.5 : pressed ? 0.8 : 1,
+          backgroundColor: pressed ? palette.accentSoft : 'transparent',
+          opacity: disabled ? 0.5 : 1,
         },
       ]}
     >
-      <Text style={{ ...typography.secondary, color: palette.accent, fontWeight: '600' }}>
+      <Text style={{ ...typography.secondary, color: palette.accent, fontWeight: '700' }}>
         {label}
       </Text>
     </Pressable>
@@ -132,11 +133,11 @@ export function ChoiceChips<T extends string | number>({
             accessibilityLabel={opt.label}
             onPress={() => onChange(opt.value)}
             style={{
-              minHeight: 48,
-              borderRadius: radius.sm,
+              minHeight: 44,
+              borderRadius: 14,
               borderWidth: 1,
               borderColor: selected ? palette.accent : palette.border,
-              backgroundColor: selected ? 'rgba(53,109,120,0.10)' : palette.surface,
+              backgroundColor: selected ? palette.accentSoft : palette.surfaceAlt,
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
               justifyContent: 'center',
@@ -186,8 +187,8 @@ export function StatusBadge({
         borderWidth: 1,
         borderColor: color,
         paddingHorizontal: spacing.sm,
-        paddingVertical: 2,
-        backgroundColor: `${color}14`,
+        paddingVertical: 3,
+        backgroundColor: `${color}22`,
       }}
     >
       <Text style={{ ...typography.small, color, fontWeight: '600' }}>{label}</Text>
@@ -217,7 +218,7 @@ export function OfflineBanner() {
       accessible
       accessibilityRole="alert"
       style={{
-        backgroundColor: 'rgba(138,90,23,0.10)',
+        backgroundColor: 'rgba(240,184,75,0.10)',
         borderBottomWidth: 1,
         borderBottomColor: palette.attention,
         paddingHorizontal: spacing.md,
@@ -271,7 +272,7 @@ export function SyncStatusCard({
               justifyContent: 'center',
             }}
           >
-            <Text style={{ ...typography.secondary, color: palette.accent, fontWeight: '600' }}>
+            <Text style={{ ...typography.secondary, color: '#071321', fontWeight: '700' }}>
               Sincronizar ahora
             </Text>
           </Pressable>
@@ -280,18 +281,19 @@ export function SyncStatusCard({
             accessibilityRole="button"
             accessibilityLabel="Iniciar sesión para sincronizar"
             onPress={onSignIn}
-            style={{
-              minHeight: 48,
+            style={({ pressed }) => ({
+              minHeight: 44,
               alignSelf: 'flex-start',
-              borderRadius: radius.sm,
+              borderRadius: 14,
               borderWidth: 1,
               borderColor: palette.accent,
+              backgroundColor: pressed ? palette.accentSoft : 'transparent',
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
               justifyContent: 'center',
-            }}
+            })}
           >
-            <Text style={{ ...typography.secondary, color: palette.accent, fontWeight: '600' }}>
+            <Text style={{ ...typography.secondary, color: palette.accent, fontWeight: '700' }}>
               Iniciar sesión para sincronizar
             </Text>
           </Pressable>

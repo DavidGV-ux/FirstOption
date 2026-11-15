@@ -351,9 +351,9 @@ export default function EstadoGeneralScreen() {
         </View>
 
         <SectionHeader title="Hematología y estudios" />
-        <Text style={styles.sectionHint}>Gráfica por métrica/estudio según registros de laboratorio.</Text>
+        <Text style={styles.sectionHint}>Gráfica por métrica/estudio según registros disponibles.</Text>
         {hema.every((m) => m.latest === null) ? (
-          <Card title="Sin estudios hematológicos"><Text style={styles.body}>Registra resultados en Laboratorio para ver su evolución y rangos informativos.</Text></Card>
+          <Card title="Sin estudios hematológicos"><Text style={styles.body}>Aún no hay registros hematológicos para mostrar evolución y rangos informativos.</Text></Card>
         ) : (
           hema.filter((m) => m.latest !== null || m.points.length > 0).map((m) => <MetricCard key={m.metricId} m={m} onPress={() => setSelectedMetricId(m.metricId)} />)
         )}
@@ -392,7 +392,7 @@ export default function EstadoGeneralScreen() {
                   <View style={[styles.statusPill, { borderColor: statusColor(selected.status.status), backgroundColor: `${statusColor(selected.status.status)}14` }]}>
                     <Text style={[styles.statusPillText, { color: statusColor(selected.status.status) }]}>{statusLabelEs(selected.status.status)}</Text>
                   </View>
-                  <View style={[styles.statusPill, { borderColor: selectedTrend.alert ? palette.priority : selectedTrend.direction === 'mejora' ? palette.success : palette.textSecondary, backgroundColor: selectedTrend.alert ? 'rgba(163,52,58,0.08)' : 'rgba(47,111,78,0.08)' }]}>
+                  <View style={[styles.statusPill, { borderColor: selectedTrend.alert ? palette.priority : selectedTrend.direction === 'mejora' ? palette.success : palette.textSecondary, backgroundColor: selectedTrend.alert ? 'rgba(232,121,121,0.14)' : 'rgba(69,197,138,0.14)' }]}>
                     <Text style={[styles.statusPillText, { color: selectedTrend.alert ? palette.priority : selectedTrend.direction === 'mejora' ? palette.success : palette.textSecondary }]}>
                       {selectedTrend.direction === 'mejora' ? '↑ Mejora' : selectedTrend.direction === 'empeoramiento' ? '↓ Empeoramiento' : selectedTrend.direction === 'estable' ? '→ Estable' : 'Sin tendencia'}
                     </Text>
@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
   cardTitle: { ...typography.cardTitle, color: palette.textPrimary },
   actionsRow: { gap: spacing.sm, marginTop: spacing.xs },
   primaryBtn: { minHeight: 48, borderRadius: radius.md, backgroundColor: palette.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
-  primaryBtnText: { ...typography.body, color: '#FFFFFF', fontWeight: '700' },
+  primaryBtnText: { ...typography.body, color: '#071321', fontWeight: '700' },
   secondaryBtn: { minHeight: 44, borderRadius: radius.md, borderWidth: 1, borderColor: palette.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
   secondaryBtnText: { ...typography.secondary, color: palette.accent, fontWeight: '600' },
   pressed: { opacity: 0.85 },
@@ -487,15 +487,15 @@ const styles = StyleSheet.create({
   modalRoot: { flex: 1, backgroundColor: palette.background },
   modalContent: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
   modalTitle: { ...typography.title, color: palette.textPrimary },
-  alertBox: { borderWidth: 1, borderColor: palette.priority, backgroundColor: 'rgba(163,52,58,0.08)', borderRadius: radius.md, padding: spacing.md, gap: 4 },
-  okBox: { borderWidth: 1, borderColor: palette.success, backgroundColor: 'rgba(47,111,78,0.08)', borderRadius: radius.md, padding: spacing.md, gap: 4 },
+  alertBox: { borderWidth: 1, borderColor: palette.priority, backgroundColor: 'rgba(232,121,121,0.12)', borderRadius: radius.md, padding: spacing.md, gap: 4 },
+  okBox: { borderWidth: 1, borderColor: palette.success, backgroundColor: 'rgba(69,197,138,0.12)', borderRadius: radius.md, padding: spacing.md, gap: 4 },
   alertTitle: { ...typography.cardTitle, color: palette.textPrimary },
   okTitle: { ...typography.cardTitle, color: palette.textPrimary },
   alertText: { ...typography.body, color: palette.textSecondary },
   chartTitle: { ...typography.secondary, color: palette.textPrimary, fontWeight: '700' },
   chartRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, paddingVertical: spacing.sm, minHeight: 160 },
   chartCol: { width: 56, alignItems: 'center', gap: 4 },
-  chartBarTrack: { height: 110, width: 28, justifyContent: 'flex-end', backgroundColor: '#EEF2F4', borderRadius: 6, overflow: 'hidden' },
+  chartBarTrack: { height: 110, width: 28, justifyContent: 'flex-end', backgroundColor: palette.surfaceAlt, borderRadius: 6, overflow: 'hidden' },
   chartBar: { width: 28, borderRadius: 6, minHeight: 4 },
   chartVal: { ...typography.small, color: palette.textPrimary, fontWeight: '700' },
   chartDate: { ...typography.small, color: palette.textSecondary, textAlign: 'center' },

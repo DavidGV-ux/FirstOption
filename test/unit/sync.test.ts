@@ -139,4 +139,26 @@ describe('SyncNowUseCase', () => {
     const result = await useCase.execute();
     expect(result.kind).toBe('remote_error');
   });
+
+  it('normaliza códigos legacy de métrica en el payload antes de enviar (symptom_nauseas -> symptom_nausea)', async () => {
+    const store = new InMemoryOutbox();
+    store.rows.push(
+      makeRow('o-legacy', 'observation', {
+        observation_id: 'o-legacy',
+        session_id: 's-legacy',
+        metric_id: 'symptom_nauseas',
+        value_original: 1,
+        observed_at: '2026-11-14T12:00:00.000Z',
+        created_at: '2026-11-14T12:00:00.000Z',
+      }),
+    );
+    const { supabase, upserts } = makeFakeSupabase({ hasSession: true });
+    const useCase = new SyncNowUseCase(supabase as never, store);
+    const result = await useCase.execute();
+    expect(result.kind).toBe('synced');
+    expect(upserts).toHaveLength(1);
+    expect(upserts[0].table).toBe('observations');
+    expect(upserts[0].payloads[0].metric_code).toBe('symptom_nausea');
+    expect(upserts[0].payloads[0].value_boolean).toBe(true);
+  });
 });

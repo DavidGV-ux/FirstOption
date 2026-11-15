@@ -15,9 +15,7 @@ import { ListRecentActivityUseCase } from '@/application/use-cases/list-recent-a
 import { SyncNowUseCase } from '@/application/use-cases/sync-now';
 import { DocumentPupilInspectionUseCase } from '@/application/use-cases/document-pupil-inspection';
 import { ManageAccountScopeUseCase } from '@/application/use-cases/manage-account';
-import { RegisterLabPanelUseCase } from '@/application/use-cases/register-lab-panel';
 import { RunTrendAnalysisUseCase } from '@/application/use-cases/run-trend-analysis';
-import { CreateBaselineUseCase } from '@/application/use-cases/create-baseline';
 import { StartCameraInspectionUseCase } from '@/application/use-cases/start-camera-inspection';
 import { CaptureInspectionFrameUseCase } from '@/application/use-cases/capture-inspection-frame';
 import { AnalyzeInspectionCaptureUseCase } from '@/application/use-cases/analyze-inspection-capture';
@@ -29,7 +27,6 @@ import { ExpoImageEncoder } from '@/infrastructure/camera/image-encoder';
 import { ExpoFrameProcessor } from '@/infrastructure/camera/expo-frame-processor';
 import { ExpoCameraCapture } from '@/infrastructure/camera/expo-camera-capture';
 import { SqliteObservationRepository } from '@/infrastructure/repositories/sqlite-observation-repository';
-import { SqliteLabRepository } from '@/infrastructure/repositories/sqlite-lab-repository';
 import { SqliteAnalysisRepository } from '@/infrastructure/repositories/sqlite-analysis-repository';
 import {
   openAppDatabase,
@@ -60,11 +57,8 @@ interface AppServices {
   registerDailyLog: RegisterDailyLogUseCase;
   documentInspection: DocumentPupilInspectionUseCase;
   manageAccount: ManageAccountScopeUseCase;
-  registerLabPanel: RegisterLabPanelUseCase;
-  labRepository: SqliteLabRepository;
   analysisRepository: SqliteAnalysisRepository;
   runTrendAnalysis: RunTrendAnalysisUseCase;
-  createBaseline: CreateBaselineUseCase;
   listRecentActivity: ListRecentActivityUseCase;
   syncNow: SyncNowUseCase | null;
   inspectionRepository: SqliteInspectionRepository;
@@ -117,7 +111,6 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
         );
         if (cancelled) return;
         const repository = new SqliteObservationRepository(opened.driver);
-        const labRepository = new SqliteLabRepository(opened.driver);
         const analysisRepository = new SqliteAnalysisRepository(opened.driver);
         const inspectionRepository = new SqliteInspectionRepository(opened.driver);
         const imageEncoder = new ExpoImageEncoder();
@@ -157,24 +150,10 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
               clock,
               ids,
             ),
-            registerLabPanel: new RegisterLabPanelUseCase(
-              repository,
-              labRepository,
-              identity,
-              clock,
-              ids,
-            ),
             analysisRepository,
             runTrendAnalysis: new RunTrendAnalysisUseCase(
               repository,
               analysisRepository,
-              identity,
-              clock,
-              ids,
-            ),
-            createBaseline: new CreateBaselineUseCase(
-              repository,
-              labRepository,
               identity,
               clock,
               ids,
@@ -184,7 +163,6 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
               repository,
               remoteSubject,
             ),
-            labRepository,
             listRecentActivity: new ListRecentActivityUseCase(repository, identity, clock),
             syncNow: supabase !== null ? new SyncNowUseCase(supabase, repository) : null,
             inspectionRepository,

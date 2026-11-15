@@ -105,8 +105,12 @@ export class SyncNowUseCase {
       throw new Error('Cliente Supabase ausente');
     }
     const raw = JSON.parse(row.payload) as Record<string, unknown>;
+    // TEMP-DIAG: payload crudo del outbox antes de adaptar.
+    console.log('[DIAG sync] pushOne', row.outbox_id, row.entity_type, 'rawPayload=', JSON.stringify(raw));
     const adapted = this.adaptPayloadForRemote(row.entity_type, row.entity_id, raw, userId);
     const table = adapted.table;
+    // TEMP-DIAG: metric_code que se enviará al remoto.
+    console.log('[DIAG sync] pushOne', row.outbox_id, '-> metric_code=', adapted.payload.metric_code, 'table=', table);
     const { error } = await this.supabase.from(table).upsert(adapted.payload, {
       onConflict: adapted.onConflict,
     });
@@ -198,13 +202,13 @@ export class SyncNowUseCase {
     };
   }
 
-  /** Normaliza códigos de métricas para compatibilidad con el catálogo remoto. */
+  /** Normaliza códigos de métricas legacy para compatibilidad con el catálogo remoto (v1, explícito). */
   private normalizeMetricCode(code: string): string {
-    const fixes: Record<string, string> = {
+    const LEGACY_METRIC_CODE_FIXES_V1: Record<string, string> = {
       sympton_nausea: 'symptom_nausea',
       symptom_nauseas: 'symptom_nausea',
     };
-    return fixes[code] ?? code;
+    return LEGACY_METRIC_CODE_FIXES_V1[code] ?? code;
   }
 
   /** Convierte un identificador estable a UUID determinístico (v4-like en formato, derivado por hash). */

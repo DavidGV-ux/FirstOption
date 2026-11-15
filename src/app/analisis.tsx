@@ -14,7 +14,6 @@ const METRICS = [
   { id: 'bp_systolic', name: 'Presión arterial sistólica', unit: 'mmHg' },
   { id: 'bp_diastolic', name: 'Presión arterial diastólica', unit: 'mmHg' },
   { id: 'spo2', name: 'Saturación de oxígeno', unit: '%' },
-  { id: 'hemoglobin', name: 'Hemoglobina', unit: 'g/L' },
 ];
 
 interface MetricStats {
@@ -257,9 +256,7 @@ export default function AnalisisScreen() {
             • Proyección experimental (pronóstico de referencia) con intervalo
             de predicción real.
           </Text>
-          <Text style={styles.bodyText}>
-            • Líneas basales versionadas y comparación contra ellas.
-          </Text>
+
           <Text style={styles.bodyText}>
             • Escenarios de cruce de umbral (desactivados por defecto).
           </Text>
@@ -294,10 +291,10 @@ const styles = StyleSheet.create({
   },
   pulseEstimateButton: {
     minHeight: 46,
-    borderRadius: radius.sm,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: palette.accent,
-    backgroundColor: 'rgba(53, 109, 120, 0.08)',
+    backgroundColor: palette.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
@@ -314,7 +311,7 @@ const styles = StyleSheet.create({
   eligibilityState: { ...typography.secondary, color: palette.accent, fontWeight: '600' },
   hintText: { ...typography.small, color: palette.textSecondary, marginTop: spacing.xs },
   errorBox: {
-    backgroundColor: 'rgba(163,52,58,0.08)',
+    backgroundColor: 'rgba(232,121,121,0.12)',
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: palette.priority,

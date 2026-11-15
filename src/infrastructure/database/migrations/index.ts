@@ -5,6 +5,7 @@ import { MIGRATION_V3_STATEMENTS } from './v003-lab-baselines-documents';
 import { MIGRATION_V4_STATEMENTS } from './v004-analysis-runs';
 import { MIGRATION_V5_STATEMENTS } from './v005-local-auth';
 import { MIGRATION_V6_STATEMENTS } from './v006-camera-inspection';
+import { MIGRATION_V7_STATEMENTS } from './v007-fix-symptom-nausea-code';
 import { METRIC_CATALOG_V1, METRIC_CATALOG_VERSION } from '@/domain/metrics/catalog-v1';
 
 export interface Migration {
@@ -111,24 +112,55 @@ export const MIGRATIONS: readonly Migration[] = [
       }
     },
   },
+  {
+    version: 7,
+    async apply(driver) {
+      for (const sql of MIGRATION_V7_STATEMENTS) {
+        await driver.exec(sql);
+      }
+    },
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 
+/**
+ * Reparaciones idempotentes y acotadas para datos legados conocidos.
+ * Se ejecutan tras migrar para sanar instalaciones donde una migración
+ * ya aplicada no corrigió completamente (p.ej. app no recargada a tiempo).
+ * No elimina datos ni altera IDs clínicos.
+ */
+async function applyKnownDataRepairs(driver: SqlDriver): Promise<void> {
+  // symptom_nauseas -> symptom_nausea (legacy). Seguro e idempotente.
+  // Corre el outbox legacy aunque user_version ya sea 7 (app no recargada tras v7).
+  const obsRes = await driver.run(
+    `UPDATE observations SET metric_id = 'symptom_nausea' WHERE metric_id = 'symptom_nauseas'`,
+  );
+  const outboxRes = await driver.run(
+    `UPDATE sync_outbox SET payload = replace(payload, 'symptom_nauseas', 'symptom_nausea'),
+         state = CASE WHEN state IN ('pending', 'failed') THEN 'pending' ELSE state END,
+         last_error = CASE WHEN state IN ('pending', 'failed') THEN NULL ELSE last_error END
+     WHERE payload LIKE '%symptom_nauseas%'`,
+  );
+  // TEMP-DIAG: reparación de datos legacy al abrir.
+  console.log('[DIAG sync] applyKnownDataRepairs observationsChanged=', obsRes.changes, 'outboxChanged=', outboxRes.changes);
+}
+
 /** Aplica migraciones pendientes de forma idempotente. */
 export async function migrateIfNeeded(driver: SqlDriver): Promise<number> {
   const row = await driver.getFirst<{ user_version: number }>('PRAGMA user_version');
-  const current = row?.user_version ?? 0;
-  if (current >= LATEST_SCHEMA_VERSION) {
-    return current;
-  }
-  for (const migration of MIGRATIONS) {
-    if (migration.version > current) {
-      await driver.withTransaction(async () => {
-        await migration.apply(driver);
-        await driver.exec(`PRAGMA user_version = ${migration.version}`);
-      });
+  let current = row?.user_version ?? 0;
+  if (current < LATEST_SCHEMA_VERSION) {
+    for (const migration of MIGRATIONS) {
+      if (migration.version > current) {
+        await driver.withTransaction(async () => {
+          await migration.apply(driver);
+          await driver.exec(`PRAGMA user_version = ${migration.version}`);
+        });
+        current = migration.version;
+      }
     }
   }
+  await applyKnownDataRepairs(driver);
   return LATEST_SCHEMA_VERSION;
 }
