@@ -242,9 +242,9 @@ export default function HomeScreen() {
 
         <View style={styles.activity}>
           <View style={styles.activityIcon}><Text style={styles.activityIconText}>!</Text></View>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.activityTitle}>Actividad reciente</Text>
-            <Text style={styles.activityText}>
+            <Text style={styles.activityText} numberOfLines={2} ellipsizeMode="tail">
               {entry
                 ? `${entry.summaryParts.length > 0 ? entry.summaryParts.join(' · ') : 'Sesión registrada'} · ${entry.syncState === 'local_only' ? 'solo en dispositivo' : entry.syncState}`
                 : 'Tu información está al día. Los registros nuevos aparecerán aquí.'}
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   activityIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(255,181,71,0.12)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   activityIconText: { color: palette.attention, fontWeight: '700' },
   activityTitle: { fontSize: 14, fontWeight: '600', color: palette.textPrimary, marginBottom: spacing.xs },
-  activityText: { fontSize: 13, color: palette.textSecondary, lineHeight: 1.7, flex: 1 },
+  activityText: { fontSize: 13, color: palette.textSecondary, lineHeight: 1.7, flex: 1, flexShrink: 1 },
   quickGrid: { flexDirection: 'row', gap: 12, flexWrap: 'wrap', marginBottom: spacing.lg },
   quick: { flex: 1, minWidth: '33%', backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, padding: spacing.md, minHeight: 128, justifyContent: 'space-between', gap: spacing.xs },
   quickPressed: { borderColor: 'rgba(10,132,255,0.6)', backgroundColor: palette.surfaceAlt },
