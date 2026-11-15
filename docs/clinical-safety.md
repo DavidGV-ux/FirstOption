@@ -60,6 +60,22 @@ actualmente un nivel 2 o superior: solo medición y estado de registro.
 - Un intervalo de referencia de laboratorio no se tratará como umbral
   operativo de misión.
 
+## Regla del PPG con linterna
+
+El modo de pulso usa la cámara trasera y el LED para detectar la onda
+de pulso (PPG) y estimar **solo la frecuencia cardíaca** (BPM) y su
+calidad de señal (SQI).
+
+- La **presión arterial** y la **SpO₂ no se miden** con cámara y
+  linterna. No se estiman, no se rellenan con valores normales y no se
+  guardan como observaciones.
+- La frecuencia cardíaca se marca siempre como aproximación
+  experimental; no sustituye un electrocardiograma, un pulsioxímetro ni
+  un esfigmomanómetro.
+- Si la señal es insuficiente, no se inventa un valor: se informa la
+  falta de señal y se ofrecen recomendaciones de colocación del dedo.
+- La app no diagnostica arritmias, hipertensión ni hipoxia.
+
 ## Regla de la linterna (inspección pupilar documentada)
 
 La linterna (Incremento 2+) existe para **iluminar durante una

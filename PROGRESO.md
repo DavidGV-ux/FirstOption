@@ -9,7 +9,7 @@
 - **Inc 4** — Análisis descriptivo puro, elegibilidad (datos insuficientes/no comparables/calidad/duplicados/método), tendencias por tiempo real, ejecuciones reproducibles (`analysis_runs` + inputs), basales versionadas, pantallas `/analisis` y `/basales`.
 
 ### En desarrollo (no cerrado)
-- **Inspección asistida por cámara (v6)** — dominio/casos de uso/infraestructura/presentación para captura guiada, métricas de calidad, estimación pupilar relativa experimental, comparación y persistencia local (`camera_inspection_*`, `SqliteInspectionRepository`). Incluye modo experimental de pulso óptico (PPG) con linterna y estimaciones aproximadas de signos vitales con calidad/limitaciones. Todo marcado como experimental: **sin diagnóstico ni medición clínica validada**. Pendiente: validación en dispositivo, calibración/precisión, revisión de privacidad/consentimiento y cobertura de pruebas adicional.
+- **Inspección asistida por cámara (v6)** — dominio/casos de uso/infraestructura/presentación para captura guiada, métricas de calidad, estimación pupilar relativa experimental, comparación y persistencia local (`camera_inspection_*`, `SqliteInspectionRepository`). Incluye modo experimental de pulso óptico (PPG) con linterna: **solo estima frecuencia cardíaca** y calidad de señal; presión arterial y SpO₂ se muestran como «no medidas» y no se guardan. Selector de lente física en iOS cuando el sistema la expone (la principal queda por defecto para acercar el flash); en Android se declara la limitación. Todo marcado como experimental: **sin diagnóstico ni medición clínica validada**. Pendiente: validación en dispositivo, calibración/precisión, revisión de privacidad/consentimiento y cobertura de pruebas adicional.
 
 ### Funcionalidades clave
 - Offline-first: UI consulta repositorios locales; guardado confirma sin esperar red.
@@ -57,8 +57,8 @@
 - `supabase/proposed-migrations/README.md` — instrucciones de aplicación.
 
 ### Pruebas
-- `test/unit/` — 64 pruebas (dominio, aplicación, sincronización, analítica, inspección por cámara).
-- `test/integration/sqlite.test.ts` — 8 pruebas sobre SQLite real (incluye migración v6 e integridad de tablas de cámara).
+- `test/unit/` — 73 pruebas (dominio, aplicación, sincronización, analítica, inspección por cámara, selección de lente y límites de PPG).
+- `test/integration/sqlite.test.ts` — 9 pruebas sobre SQLite real (incluye migración v6, migración v7 e integridad de tablas de cámara).
 
 ### Documentación
 - `docs/` — product, architecture, evidence, clinical-safety, data-dictionary, offline-sync, analytics-methods, validation-plan, model-cards.

@@ -39,8 +39,8 @@ export class EstimatePulseVitalsUseCase {
 
     const userNote = note && note.trim().length > 0 ? note.trim() : null;
     const sessionNote = userNote
-      ? `Estimación óptica de pulso y signos vitales con linterna: ${userNote}`
-      : `Estimación óptica de pulso con linterna (BPM: ${estimate.bpm}, SQI: ${Math.round(estimate.sqi * 100)}%)`;
+      ? `Estimación óptica de frecuencia cardíaca con linterna: ${userNote}`
+      : `Estimación óptica de frecuencia cardíaca con linterna (BPM: ${estimate.bpm}, SQI: ${Math.round(estimate.sqi * 100)}%)`;
 
     const session: MeasurementSession = {
       sessionId,
@@ -61,48 +61,6 @@ export class EstimatePulseVitalsUseCase {
         metricId: 'heart_rate',
         valueOriginal: estimate.estimatedVitals.heartRate,
         unitOriginal: 'lpm',
-        valueNormalized: null,
-        unitNormalized: null,
-        observedAt: nowIso,
-        localDate,
-        qualityState: estimate.quality === 'good' || estimate.quality === 'acceptable' ? 'ok' : 'suspect',
-        syncState: 'local_only',
-        createdAt: nowIso,
-      },
-      {
-        observationId: `obs-pas-${this.ids.uuid()}`,
-        sessionId,
-        metricId: 'bp_systolic',
-        valueOriginal: estimate.estimatedVitals.bpSystolic,
-        unitOriginal: 'mmHg',
-        valueNormalized: null,
-        unitNormalized: null,
-        observedAt: nowIso,
-        localDate,
-        qualityState: estimate.quality === 'good' || estimate.quality === 'acceptable' ? 'ok' : 'suspect',
-        syncState: 'local_only',
-        createdAt: nowIso,
-      },
-      {
-        observationId: `obs-pad-${this.ids.uuid()}`,
-        sessionId,
-        metricId: 'bp_diastolic',
-        valueOriginal: estimate.estimatedVitals.bpDiastolic,
-        unitOriginal: 'mmHg',
-        valueNormalized: null,
-        unitNormalized: null,
-        observedAt: nowIso,
-        localDate,
-        qualityState: estimate.quality === 'good' || estimate.quality === 'acceptable' ? 'ok' : 'suspect',
-        syncState: 'local_only',
-        createdAt: nowIso,
-      },
-      {
-        observationId: `obs-spo2-${this.ids.uuid()}`,
-        sessionId,
-        metricId: 'spo2',
-        valueOriginal: estimate.estimatedVitals.spo2,
-        unitOriginal: '%',
         valueNormalized: null,
         unitNormalized: null,
         observedAt: nowIso,

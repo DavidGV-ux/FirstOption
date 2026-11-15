@@ -9,6 +9,8 @@ import {
 import { CameraView } from 'expo-camera';
 import type { RawCapturedImage } from '@/domain/camera-inspection/ports/camera-capture-port';
 import { CaptureGuide } from './CaptureGuide';
+import { CameraLensPicker } from './CameraLensPicker';
+import { useCameraLenses } from './use-camera-lenses';
 import { palette, radius, spacing, typography } from '@/presentation/theme/tokens';
 
 export interface CameraInspectionViewProps {
@@ -26,11 +28,29 @@ export function CameraInspectionView({
 }: CameraInspectionViewProps) {
   const cameraRef = useRef<CameraView>(null);
   const [facing, setFacing] = useState<'front' | 'back'>('front');
+  const lens = useCameraLenses(cameraRef, facing);
   const [cameraReady, setCameraReady] = useState(false);
   const [mountError, setMountError] = useState<string | null>(null);
+  const [cameraKey, setCameraKey] = useState(0);
 
   const toggleFacing = useCallback(() => {
+    setCameraReady(false);
+    setMountError(null);
     setFacing((prev) => (prev === 'front' ? 'back' : 'front'));
+  }, []);
+
+  const handleSelectLens = useCallback(
+    (deviceType: string) => {
+      setMountError(null);
+      lens.selectLens(deviceType);
+    },
+    [lens],
+  );
+
+  const handleRetryCamera = useCallback(() => {
+    setMountError(null);
+    setCameraReady(false);
+    setCameraKey((value) => value + 1);
   }, []);
 
   const handleCapture = useCallback(async () => {
@@ -65,13 +85,21 @@ export function CameraInspectionView({
       {/* Marco de vista de cámara */}
       <View style={styles.cameraFrame}>
         <CameraView
+          key={`${facing}-${cameraKey}`}
           ref={cameraRef}
           style={styles.camera}
           facing={facing}
+          selectedLens={lens.selectedLens ?? undefined}
           enableTorch={facing === 'back' && torchOn}
           animateShutter={false}
-          onCameraReady={() => setCameraReady(true)}
+          onCameraReady={() => {
+            setCameraReady(true);
+            setMountError(null);
+            lens.handleCameraReady();
+          }}
+          onAvailableLensesChanged={lens.handleAvailableLensesChanged}
           onMountError={(e) => {
+            setCameraReady(false);
             setMountError(`No se pudo iniciar la cámara: ${e.message}. El registro manual permanece disponible.`);
           }}
         />
@@ -124,9 +152,26 @@ export function CameraInspectionView({
         )}
       </View>
 
+      <CameraLensPicker
+        facing={facing}
+        status={lens.status}
+        options={lens.options}
+        selectedLens={lens.selectedLens}
+        onSelect={handleSelectLens}
+        disabled={isProcessing}
+      />
+
       {mountError && (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{mountError}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Reintentar el montaje de la cámara"
+            onPress={handleRetryCamera}
+            style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.retryButtonText}>Reintentar cámara</Text>
+          </Pressable>
         </View>
       )}
 
@@ -230,9 +275,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.sm,
     padding: spacing.sm,
+    gap: spacing.xs,
   },
   errorText: {
     ...typography.small,
+    color: palette.priority,
+  },
+  retryButton: {
+    minHeight: 40,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.priority,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  retryButtonText: {
+    ...typography.secondary,
+    fontWeight: '700',
     color: palette.priority,
   },
   pressed: {

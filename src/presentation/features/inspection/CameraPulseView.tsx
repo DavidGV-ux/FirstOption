@@ -13,6 +13,8 @@ import type { MissionPhase } from '@/domain/observations/observation';
 import { PpgProcessor, type PpgSample } from '@/infrastructure/camera/ppg-processor';
 import { useAppServices } from '@/app/_providers';
 import { cardStyle, palette, radius, spacing, typography } from '@/presentation/theme/tokens';
+import { CameraLensPicker } from './CameraLensPicker';
+import { useCameraLenses } from './use-camera-lenses';
 
 export interface CameraPulseViewProps {
   missionPhase: MissionPhase | null;
@@ -26,6 +28,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
   const services = useAppServices();
   const cameraRef = useRef<CameraView>(null);
   const processor = useMemo(() => new PpgProcessor(), []);
+  const lens = useCameraLenses(cameraRef, 'back');
 
   const [measuring, setMeasuring] = useState(false);
   const [attempt, setAttempt] = useState<1 | 2 | 3 | null>(null);
@@ -40,6 +43,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
   const [cameraReady, setCameraReady] = useState(false);
   const [pictureSize, setPictureSize] = useState<string | undefined>(undefined);
   const [mountError, setMountError] = useState<string | null>(null);
+  const [cameraKey, setCameraKey] = useState(0);
   const samplesRef = useRef<PpgSample[]>([]);
   const captureFailuresRef = useRef(0);
 
@@ -64,6 +68,24 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
     } catch {
       // Si no se puede, usar tamaño por defecto
     }
+  }, []);
+
+  const handleSelectLens = useCallback(
+    (deviceType: string) => {
+      if (measuring) return;
+      lens.selectLens(deviceType);
+      // La sesión nativa se reconfigura; refrescamos el tamaño de captura.
+      setTimeout(() => {
+        void pickSmallestPictureSize();
+      }, 500);
+    },
+    [lens, measuring, pickSmallestPictureSize],
+  );
+
+  const handleRetryCamera = useCallback(() => {
+    setMountError(null);
+    setCameraReady(false);
+    setCameraKey((value) => value + 1);
   }, []);
 
   // Muestreo controlado secuencial de luminancia con linterna activa (con reintentos automáticos)
@@ -234,10 +256,10 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
       await services.estimatePulseVitals.saveAsObservationSession({
         estimate: currentPulse,
         missionPhase: missionPhase ?? 'preflight',
-        note: `Pulso óptico aproximado con linterna (BPM: ${currentPulse.bpm}, PAS: ${currentPulse.estimatedVitals.bpSystolic}, PAD: ${currentPulse.estimatedVitals.bpDiastolic}, SpO2: ${currentPulse.estimatedVitals.spo2}%)`,
+        note: `Pulso óptico aproximado con linterna (BPM: ${currentPulse.bpm}, SQI: ${Math.round(currentPulse.sqi * 100)}%). Presión arterial y SpO₂ no medidas.`,
       });
       setSavedSuccess(
-        'Signos vitales estimados guardados en este dispositivo. Ahora se reflejan en el Historial y en el Análisis descriptivo.',
+        'Frecuencia cardíaca estimada guardada en este dispositivo. Ahora se refleja en el Historial y en el Análisis descriptivo. No se guardaron presión arterial ni SpO₂ porque no se midieron.',
       );
       if (onSaved) onSaved();
     } catch {
@@ -254,9 +276,6 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
       pathname: '/registrar',
       params: {
         estHeartRate: String(currentPulse.estimatedVitals.heartRate),
-        estBpSystolic: String(currentPulse.estimatedVitals.bpSystolic),
-        estBpDiastolic: String(currentPulse.estimatedVitals.bpDiastolic),
-        estSpo2: String(currentPulse.estimatedVitals.spo2),
       },
     });
   };
@@ -266,17 +285,23 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
       {/* Vista de cámara trasera con linterna activa para PPG */}
       <View style={styles.cameraBox}>
         <CameraView
+          key={cameraKey}
           ref={cameraRef}
           style={styles.camera}
           facing="back"
+          selectedLens={lens.selectedLens ?? undefined}
           enableTorch={torchEnabled}
           animateShutter={false}
           pictureSize={pictureSize}
           onCameraReady={() => {
             setCameraReady(true);
+            setMountError(null);
+            lens.handleCameraReady();
             void pickSmallestPictureSize();
           }}
+          onAvailableLensesChanged={lens.handleAvailableLensesChanged}
           onMountError={(e) => {
+            setCameraReady(false);
             setMountError(
               `No se pudo iniciar la cámara/linterna: ${e.message}. En Expo Go la linterna puede no estar disponible; usa un development build.`,
             );
@@ -310,9 +335,51 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
         </View>
       </View>
 
-      {mountError ? <Text style={styles.errorText}>{mountError}</Text> : null}
+      <CameraLensPicker
+        facing="back"
+        status={lens.status}
+        options={lens.options}
+        selectedLens={lens.selectedLens}
+        onSelect={handleSelectLens}
+        disabled={measuring}
+      />
+
+      {mountError ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{mountError}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Reintentar el montaje de la cámara"
+            onPress={handleRetryCamera}
+            style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.retryButtonText}>Reintentar cámara</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {infoMsg && !mountError ? <Text style={styles.infoText}>{infoMsg}</Text> : null}
       {errorMsg && !mountError ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+
+      {/* Prueba de linterna: ayuda a ubicar la lente que está junto al flash */}
+      {!measuring && cameraReady ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            torchEnabled ? 'Apagar la linterna de prueba' : 'Encender la linterna para ubicar el flash'
+          }
+          accessibilityState={{ selected: torchEnabled }}
+          onPress={() => setTorchEnabled((value) => !value)}
+          style={({ pressed }) => [
+            styles.torchTestButton,
+            torchEnabled && styles.torchTestButtonOn,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={[styles.torchTestText, torchEnabled && styles.torchTestTextOn]}>
+            {torchEnabled ? 'Apagar linterna de prueba' : 'Probar linterna (ubicar el flash)'}
+          </Text>
+        </Pressable>
+      ) : null}
 
       {/* Botón para iniciar / reiniciar medición */}
       {!measuring ? (
@@ -349,7 +416,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
       {/* Resultados de la estimación */}
       {currentPulse && currentPulse.sampleCount >= 6 && (
         <View style={[cardStyle, styles.vitalsCard]}>
-          <Text style={styles.cardHeader}>Signos vitales aproximados (PPG con linterna)</Text>
+          <Text style={styles.cardHeader}>Frecuencia cardíaca estimada (PPG con linterna)</Text>
 
           <View style={styles.mainBpmRow}>
             <View>
@@ -365,19 +432,23 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
             </View>
           </View>
 
-          {/* Grilla de valores derivados calculados */}
+          {/* Grilla de valores: solo se muestra lo realmente medido */}
           <View style={styles.grid}>
             <View style={styles.gridItem}>
-              <Text style={styles.gridLabel}>Presión sistólica (est.)</Text>
-              <Text style={styles.gridValue}>{currentPulse.estimatedVitals.bpSystolic} mmHg</Text>
+              <Text style={styles.gridLabel}>Frecuencia cardíaca</Text>
+              <Text style={styles.gridValue}>
+                {currentPulse.estimatedVitals.heartRate} lpm
+              </Text>
             </View>
             <View style={styles.gridItem}>
-              <Text style={styles.gridLabel}>Presión diastólica (est.)</Text>
-              <Text style={styles.gridValue}>{currentPulse.estimatedVitals.bpDiastolic} mmHg</Text>
+              <Text style={styles.gridLabel}>Presión arterial</Text>
+              <Text style={styles.gridValue}>No medida</Text>
+              <Text style={styles.gridNote}>La cámara y el LED no miden presión.</Text>
             </View>
             <View style={styles.gridItem}>
-              <Text style={styles.gridLabel}>Saturación SpO₂ (est.)</Text>
-              <Text style={styles.gridValue}>{currentPulse.estimatedVitals.spo2} %</Text>
+              <Text style={styles.gridLabel}>Saturación SpO₂</Text>
+              <Text style={styles.gridValue}>No medida</Text>
+              <Text style={styles.gridNote}>Se necesita un pulsioxímetro.</Text>
             </View>
             <View style={styles.gridItem}>
               <Text style={styles.gridLabel}>Confianza de señal</Text>
@@ -386,8 +457,9 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
           </View>
 
           <Text style={styles.disclaimerText}>
-            Aproximación experimental derivada de pulsaciones ópticas con linterna. No constituye
-            una medición clínica validada ni un diagnóstico.
+            Solo se estima la frecuencia cardíaca a partir de la señal óptica. La presión
+            arterial y la SpO₂ no se miden con cámara y linterna: no se inventan valores de
+            referencia ni se guardan como si fueran mediciones. No constituye diagnóstico.
           </Text>
 
           {/* Acciones para guardar o transferir a registro */}
@@ -568,6 +640,11 @@ const styles = StyleSheet.create({
     color: palette.textPrimary,
     marginTop: 2,
   },
+  gridNote: {
+    ...typography.small,
+    color: palette.textSecondary,
+    marginTop: 2,
+  },
   disclaimerText: {
     ...typography.small,
     color: palette.textSecondary,
@@ -617,6 +694,50 @@ const styles = StyleSheet.create({
   errorText: {
     ...typography.small,
     color: palette.priority,
+  },
+  errorBox: {
+    gap: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.priority,
+    backgroundColor: 'rgba(207, 74, 74, 0.08)',
+  },
+  retryButton: {
+    minHeight: 40,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.priority,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  retryButtonText: {
+    ...typography.secondary,
+    fontWeight: '700',
+    color: palette.priority,
+  },
+  torchTestButton: {
+    minHeight: 44,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  torchTestButtonOn: {
+    borderColor: palette.accent,
+    backgroundColor: 'rgba(53, 109, 120, 0.12)',
+  },
+  torchTestText: {
+    ...typography.secondary,
+    fontWeight: '600',
+    color: palette.textPrimary,
+  },
+  torchTestTextOn: {
+    color: palette.accent,
   },
   infoText: {
     ...typography.small,

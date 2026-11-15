@@ -1,8 +1,11 @@
 export interface EstimatedVitals {
-  heartRate: number; // lpm
-  bpSystolic: number; // mmHg (aproximación basada en pulso)
-  bpDiastolic: number; // mmHg (aproximación basada en pulso)
-  spo2: number; // % saturación periférica aproximada
+  heartRate: number; // lpm (medido por PPG)
+  /** No medido con PPG de cámara: siempre null. */
+  bpSystolic: number | null; // mmHg
+  /** No medido con PPG de cámara: siempre null. */
+  bpDiastolic: number | null; // mmHg
+  /** No medido con PPG de cámara: siempre null. */
+  spo2: number | null; // %
 }
 
 export interface PulseEstimate {

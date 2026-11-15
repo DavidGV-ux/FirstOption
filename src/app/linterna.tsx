@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Linking,
   Pressable,
@@ -59,6 +59,14 @@ export default function LinternaScreen() {
   // Modo de inspección: pupilar, pulso/PPG con linterna, o linterna manual
   const [inspectionMode, setInspectionMode] = useState<'pupil' | 'pulse' | 'plr' | 'manual'>('pupil');
 
+  // En Android, montar la cámara nueva antes de que la anterior termine de
+  // liberarse puede bloquear CameraX. Desmontamos, cambiamos de modo y
+  // volvemos a montar tras una pausa breve.
+  const [cameraMounted, setCameraMounted] = useState(true);
+  const [switchingMode, setSwitchingMode] = useState<'pupil' | 'pulse' | null>(null);
+  const [cameraGeneration, setCameraGeneration] = useState(0);
+  const switchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Formulario y estado de inspección
   const [phase, setPhase] = useState<MissionPhase | null>(null);
   const [eyeSide, setEyeSide] = useState<EyeSide>('left');
@@ -102,12 +110,41 @@ export default function LinternaScreen() {
   useFocusEffect(
     useCallback(() => {
       setFocused(true);
+      setCameraMounted(true);
       void loadRecentHistory();
       return () => {
         setFocused(false);
+        setCameraMounted(false);
         setTorchOn(false);
       };
     }, [loadRecentHistory]),
+  );
+
+  // Cambio de modo con desmontaje previo de la cámara (evita bloqueos de
+  // CameraX en Android al alternar pupila <-> pulso).
+  const switchInspectionMode = useCallback(
+    (next: 'pupil' | 'pulse') => {
+      if (next === inspectionMode || switchingMode !== null) return;
+      setTorchOn(false);
+      setCameraMounted(false);
+      setSwitchingMode(next);
+      if (switchTimerRef.current) clearTimeout(switchTimerRef.current);
+      switchTimerRef.current = setTimeout(() => {
+        switchTimerRef.current = null;
+        setInspectionMode(next);
+        setCameraGeneration((value) => value + 1);
+        setCameraMounted(true);
+        setSwitchingMode(null);
+      }, 320);
+    },
+    [inspectionMode, switchingMode],
+  );
+
+  useEffect(
+    () => () => {
+      if (switchTimerRef.current) clearTimeout(switchTimerRef.current);
+    },
+    [],
   );
 
   // Manejo de captura de fotograma
@@ -275,7 +312,8 @@ export default function LinternaScreen() {
               accessibilityRole="button"
               accessibilityLabel="Modo captura pupilar asistida por cámara"
               accessibilityState={{ selected: inspectionMode === 'pupil' }}
-              onPress={() => setInspectionMode('pupil')}
+              onPress={() => switchInspectionMode('pupil')}
+              disabled={switchingMode !== null}
               style={[styles.option, inspectionMode === 'pupil' && styles.optionSelected]}
             >
               <Text style={[styles.optionLabel, inspectionMode === 'pupil' && styles.optionLabelSelected]}>
@@ -287,7 +325,8 @@ export default function LinternaScreen() {
               accessibilityRole="button"
               accessibilityLabel="Modo medición de pulso con linterna (PPG)"
               accessibilityState={{ selected: inspectionMode === 'pulse' }}
-              onPress={() => setInspectionMode('pulse')}
+              onPress={() => switchInspectionMode('pulse')}
+              disabled={switchingMode !== null}
               style={[styles.option, inspectionMode === 'pulse' && styles.optionSelected]}
             >
               <Text style={[styles.optionLabel, inspectionMode === 'pulse' && styles.optionLabelSelected]}>
@@ -307,6 +346,11 @@ export default function LinternaScreen() {
               </Text>
             </Pressable>
           </View>
+          {switchingMode ? (
+            <Text style={styles.hintText}>
+              Cambiando de modo y liberando la cámara del modo anterior…
+            </Text>
+          ) : null}
         </View>
 
         {/* Permisos de cámara */}
@@ -349,8 +393,9 @@ export default function LinternaScreen() {
                     Encuadra el ojo dentro de la guía circular. Mantén la vista fija unos segundos.
                   </Text>
 
-                  {focused && (
+                  {focused && cameraMounted && (
                     <CameraInspectionView
+                      key={`pupil-${cameraGeneration}`}
                       onCapture={(captured) => void handleCapture(captured)}
                       isProcessing={isProcessing}
                       torchOn={torchOn}
@@ -393,8 +438,9 @@ export default function LinternaScreen() {
                   medir las pulsaciones y estimar los signos vitales.
                 </Text>
 
-                {focused && (
+                {focused && cameraMounted && (
                   <CameraPulseView
+                    key={`pulse-${cameraGeneration}`}
                     missionPhase={phase}
                     onSaved={() => void loadRecentHistory()}
                   />
@@ -424,7 +470,7 @@ export default function LinternaScreen() {
                   El LED funciona únicamente como iluminación de inspección; no realiza
                   mediciones clínicas.
                 </Text>
-                {focused && permission?.granted ? (
+                {focused && cameraMounted && permission?.granted ? (
                   <CameraView
                     style={styles.hiddenTorchCamera}
                     facing="back"
