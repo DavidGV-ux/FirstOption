@@ -97,7 +97,7 @@ export function CameraInspectionView({
           style={({ pressed }) => [styles.controlButton, pressed && styles.pressed]}
         >
           <Text style={styles.controlButtonText}>
-            🔄 {facing === 'front' ? 'Cámara frontal' : 'Cámara trasera'}
+            {facing === 'front' ? 'Cámara frontal' : 'Cámara trasera'}
           </Text>
         </Pressable>
 
@@ -118,7 +118,7 @@ export function CameraInspectionView({
                 torchOn && styles.torchActiveText,
               ]}
             >
-              💡 {torchOn ? 'Linterna encendida' : 'Linterna apagada'}
+              {torchOn ? 'Linterna encendida' : 'Linterna apagada'}
             </Text>
           </Pressable>
         )}

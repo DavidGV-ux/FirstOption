@@ -266,7 +266,7 @@ export default function LinternaScreen() {
         {/* Aviso y disclaimer ético obligatorio permanente */}
         <InspectionDisclaimer />
 
-        {/* Selector de modo: Pupilar vs Pulso (PPG) vs Linterna manual */}
+        {/* Selector de modo: Pupilar vs Pulso (PPG) */}
         <View style={[cardStyle, styles.modeSection]}>
           <Text style={styles.sectionTitle}>Modo de inspección asistida</Text>
           <View style={styles.row}>
@@ -278,7 +278,7 @@ export default function LinternaScreen() {
               style={[styles.option, inspectionMode === 'pupil' && styles.optionSelected]}
             >
               <Text style={[styles.optionLabel, inspectionMode === 'pupil' && styles.optionLabelSelected]}>
-                👁 Pupila asistida
+                Pupila asistida
               </Text>
             </Pressable>
 
@@ -290,19 +290,7 @@ export default function LinternaScreen() {
               style={[styles.option, inspectionMode === 'pulse' && styles.optionSelected]}
             >
               <Text style={[styles.optionLabel, inspectionMode === 'pulse' && styles.optionLabelSelected]}>
-                💓 Pulso con linterna (PPG)
-              </Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Modo linterna manual sin captura"
-              accessibilityState={{ selected: inspectionMode === 'manual' }}
-              onPress={() => setInspectionMode('manual')}
-              style={[styles.option, inspectionMode === 'manual' && styles.optionSelected]}
-            >
-              <Text style={[styles.optionLabel, inspectionMode === 'manual' && styles.optionLabelSelected]}>
-                💡 Linterna manual
+                Pulso con linterna (PPG)
               </Text>
             </Pressable>
           </View>
@@ -427,7 +415,7 @@ export default function LinternaScreen() {
                   ]}
                 >
                   <Text style={[styles.torchButtonLabel, torchOn && styles.torchButtonLabelOn]}>
-                    {torchOn ? '💡 Apagar linterna' : '💡 Encender linterna'}
+                    {torchOn ? 'Apagar linterna' : 'Encender linterna'}
                   </Text>
                 </Pressable>
                 <Text style={styles.hintText}>
@@ -613,7 +601,7 @@ export default function LinternaScreen() {
                       onPress={() => void handleDeleteImage()}
                       style={styles.deleteImageButton}
                     >
-                      <Text style={styles.deleteImageButtonText}>🗑 Eliminar imagen guardada</Text>
+                      <Text style={styles.deleteImageButtonText}>Eliminar imagen guardada</Text>
                     </Pressable>
                   </View>
                 )}

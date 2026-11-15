@@ -149,7 +149,7 @@ export default function AnalisisScreen() {
           style={({ pressed }) => [styles.pulseEstimateButton, pressed && styles.pressed]}
         >
           <Text style={styles.pulseEstimateButtonText}>
-            ⚡ Medir pulso y aproximar vitales con linterna (PPG)
+            Medir pulso y aproximar vitales con linterna (PPG)
           </Text>
         </Pressable>
 

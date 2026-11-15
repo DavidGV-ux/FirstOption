@@ -277,7 +277,7 @@ export default function RegisterScreen() {
             style={({ pressed }) => [styles.estimateButton, pressed && styles.pressed]}
           >
             <Text style={styles.estimateButtonText}>
-              ⚡ Medir pulso y estimar vitales con linterna (PPG)
+              Medir pulso y estimar vitales con linterna (PPG)
             </Text>
           </Pressable>
           <Controller

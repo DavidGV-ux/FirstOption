@@ -331,8 +331,8 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
             {!cameraReady
               ? 'Preparando cámara…'
               : currentPulse
-                ? '⚡ Repetir medición de pulso'
-                : '⚡ Iniciar medición con linterna (PPG)'}
+                ? 'Repetir medición de pulso'
+                : 'Iniciar medición con linterna (PPG)'}
           </Text>
         </Pressable>
       ) : (
@@ -400,7 +400,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
               style={[styles.saveBtn, saving && styles.btnDisabled]}
             >
               <Text style={styles.saveBtnText}>
-                {saving ? 'Guardando…' : '💾 Guardar en Análisis y Seguimiento'}
+                {saving ? 'Guardando…' : 'Guardar en Análisis y Seguimiento'}
               </Text>
             </Pressable>
 
