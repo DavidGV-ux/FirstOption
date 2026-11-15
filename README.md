@@ -19,15 +19,15 @@ Prototipo móvil de seguimiento longitudinal (contextos análogos, bienestar y r
 | Autenticación Supabase (email + contraseña, sesión en SecureStore) | ✅ Implementado |
 | Alcance por cuenta: los datos locales de una cuenta no se mezclan con los de otra | ✅ Implementado (scoping por `subject_id` + adopción explícita de registros del dispositivo) |
 | Sincronización Supabase (outbox transaccional + push idempotente) | ✅ Implementado; **requiere aplicar el modelo remoto** (`supabase/proposed-migrations/`) |
-| Auto-sync por conectividad/foreground y pull remoto con cursor de servidor | ⏳ Pendiente (continuación del Incremento 2) |
+| Auto-sync por conectividad, foreground y verificación periódica | ✅ Implementado (valida cuentas locales pendientes y empuja el outbox; pull remoto con cursor de servidor sigue pendiente) |
 | Hematología: panel de laboratorio, unidades originales y convertidas, fecha de toma/reporte, laboratorio, muestra, método, intervalo de referencia, estado de verificación | ✅ Implementado (`/laboratorio`) |
 | Documentos privados del laboratorio (metadatos + copia en sandbox privado con SHA-256) | ✅ Infraestructura implementada; falta la captura en UI |
 | Líneas basales versionadas (periodo, método, observaciones de origen, estado) | ✅ Implementado (`/basales`) |
 | Elegibilidad analítica (datos insuficientes, no comparable, calidad, duplicados, cambio de método) | ✅ Implementado |
 | Descripción estadística y tendencias por tiempo real (método versionado, n visible, unidades) | ✅ Implementado (`/analisis`) |
 | Ejecuciones de análisis reproducibles (`analysis_runs` + observaciones de entrada) | ✅ Implementado |
-| Inspección asistida por cámara (captura guiada, calidad de señal, estimación pupilar relativa experimental, comparación y registro de inspección) | 🚧 En desarrollo (`/linterna`): flujo y persistencia local en progreso; aproximaciones experimentales, **no** mediciones clínicas ni diagnóstico |
-| Estimación óptica de pulso con linterna (PPG) y derivación experimental de signos vitales | 🚧 Experimental (`/linterna`): señal/estimaciones aproximadas con calidad y limitaciones; **no** sustituye medición clínica ni diagnóstico |
+| Reflejo fotomotor pupilar (PLR) experimental | 🚧 Experimental (`/linterna`): pulso de luz y cinemática; solo muestra valores si hay muestras reales, **no** clasifica fatiga ni diagnostica |
+| Pulso óptico con linterna (PPG) | 🚧 Experimental (`/linterna`): solo frecuencia cardíaca y calidad de señal; presión y SpO₂ no se miden ni se guardan |
 | Pronóstico de referencia y proyección experimental con intervalo de predicción real | ⏳ Pendiente (Incremento 5) |
 | Protocolos versionados, eventos de revisión y exportación | ⏳ Pendiente (Incremento 6) |
 | Voz y pupila automatizadas validadas | ⏳ Fuera de alcance por ahora: sin modelos/feature flags validados; la app no simula mediciones ni conclusiones clínicas |
@@ -52,9 +52,10 @@ Detalle del avance en [`PROGRESO.md`](PROGRESO.md).
 - React Hook Form + Zod.
 - Sistema de diseño responsivo (1 columna en móvil, 2 en tablet) con
   tokens de color verificados y foco en accesibilidad.
-- Pruebas: Jest (64 unitarias: dominio, aplicación, sincronización,
-  analítica, inspección por cámara) + SQLite real con `node:sqlite` (8 de
-  integración: migraciones, persistencia, integridad, outbox, cámara).
+- Pruebas: Jest (89 unitarias: dominio, aplicación, sincronización,
+  autenticación offline, analítica, inspección por cámara) + SQLite real
+  con `node:sqlite` (9 de integración: migraciones, persistencia,
+  integridad, outbox, cámara).
 
 ## Requisitos
 
@@ -94,29 +95,36 @@ se bloquea con un mensaje explícito.
 
 ## Cuentas y datos por usuario
 
-- Inicio → "Iniciar sesión para sincronizar" → crear cuenta o iniciar
-  sesión con email y contraseña (Supabase Auth).
-- Mientras hay sesión, cada registro se guarda con `subject_id = auth.uid()`:
-  cumple la FK remota y las políticas RLS (`subject_id = auth.uid()`), y
-  el push idempotente lo replica en Supabase.
-- Sin sesión, la app usa un **alcance local del dispositivo**: los datos
-  se guardan igual (offline-first) pero **no** se atribuyen a ninguna
-  cuenta remota.
+- La app abre siempre en el acceso. Sin sesión remota o local no se
+  muestra el inicio ni se leen datos.
+- Con internet, el acceso usa Supabase Auth (email y contraseña).
+- Sin internet, puedes crear una cuenta local: las credenciales quedan
+  en el almacén seguro del dispositivo y la cuenta se valida y sube a
+  Supabase automáticamente al recuperar conexión.
+- Mientras hay sesión remota, cada registro se guarda con
+  `subject_id = auth.uid()`: cumple la FK remota y las políticas RLS
+  (`subject_id = auth.uid()`), y el push idempotente lo replica en Supabase.
+- Sin sesión remota, la app usa un **alcance local del dispositivo**:
+  los datos se guardan igual (offline-first) y el auto-sync los empuja
+  en cuanto la cuenta queda vinculada.
 - Al iniciar sesión, los registros del dispositivo **no** se reasignan
   solos: la app muestra cuántos hay y ofrece una acción explícita para
   asociarlos a la cuenta.
 - Dos cuentas que usan el mismo dispositivo no ven los datos de la otra:
   todas las lecturas locales filtran por el alcance activo.
-- Sin conexión no hay autenticación remota: la app sigue funcionando
-  localmente y lo dice; no promete re-autenticarse sin internet.
+- Una contraseña guardada temporalmente para crear la cuenta sin
+  internet se borra en cuanto la cuenta remota queda vinculada.
 
 ## Sincronización con Supabase (cuando hay internet)
 
-1. En Inicio → "Iniciar sesión para sincronizar" → crear/iniciar sesión.
+1. Crea la cuenta o inicia sesión (también puede crearse sin conexión).
 2. Registra tu seguimiento (funciona igual sin conexión).
-3. "Sincronizar ahora": push idempotente vía outbox (sesiones antes que
-   observaciones). Los fallos quedan visibles y se reintentan; nada se
-   descarta sin confirmación del servidor.
+3. El auto-sync revisa la conexión al recuperarla, al volver la app a
+   primer plano y cada 2 minutos; valida una cuenta local pendiente y
+   empuja el outbox (sesiones antes que observaciones).
+4. "Sincronizar ahora" sigue disponible para forzar el push. Los fallos
+   quedan visibles y se reintentan; nada se descarta sin confirmación del
+   servidor.
 
 **Pendiente de tu acción:** el esquema remoto aún no está aplicado; hasta
 que se ejecute `supabase/proposed-migrations/000_supabase_model_v2.sql`

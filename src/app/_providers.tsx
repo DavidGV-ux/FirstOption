@@ -15,6 +15,7 @@ import { ListRecentActivityUseCase } from '@/application/use-cases/list-recent-a
 import { SyncNowUseCase } from '@/application/use-cases/sync-now';
 import { DocumentPupilInspectionUseCase } from '@/application/use-cases/document-pupil-inspection';
 import { ManageAccountScopeUseCase } from '@/application/use-cases/manage-account';
+import { ManageAuthUseCase } from '@/application/use-cases/manage-auth';
 import { RunTrendAnalysisUseCase } from '@/application/use-cases/run-trend-analysis';
 import { StartCameraInspectionUseCase } from '@/application/use-cases/start-camera-inspection';
 import { CaptureInspectionFrameUseCase } from '@/application/use-cases/capture-inspection-frame';
@@ -35,10 +36,13 @@ import {
   isUnencryptedDemoModeAllowed,
 } from '@/infrastructure/database/open-database';
 import { SecureStoreKeyProvider } from '@/infrastructure/security/db-key-store';
+import { SecureLocalAccountStore } from '@/infrastructure/security/local-account-store';
+import { ExpoPasswordHasher } from '@/infrastructure/security/expo-password-hasher';
 import {
   LocalSubjectIdentity,
   type RemoteSubjectProvider,
 } from '@/infrastructure/security/local-subject-identity';
+import { SupabaseAuthAdapter } from '@/infrastructure/supabase/supabase-auth-adapter';
 import { CryptoIdGenerator } from '@/infrastructure/ids/uuid-generator';
 import { SystemClock } from '@/infrastructure/clock/system-clock';
 import {
@@ -59,6 +63,7 @@ interface AppServices {
   registerDailyLog: RegisterDailyLogUseCase;
   documentInspection: DocumentPupilInspectionUseCase;
   manageAccount: ManageAccountScopeUseCase;
+  auth: ManageAuthUseCase;
   analysisRepository: SqliteAnalysisRepository;
   runTrendAnalysis: RunTrendAnalysisUseCase;
   listRecentActivity: ListRecentActivityUseCase;
@@ -143,6 +148,12 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
                 },
               };
         const identity = new LocalSubjectIdentity(opened.driver, remoteSubject);
+        const auth = new ManageAuthUseCase(
+          new SecureLocalAccountStore(),
+          supabase === null ? null : new SupabaseAuthAdapter(supabase),
+          new ExpoPasswordHasher(),
+          clock,
+        );
         setState({
           phase: 'ready',
           services: {
@@ -166,6 +177,7 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
               repository,
               remoteSubject,
             ),
+            auth,
             listRecentActivity: new ListRecentActivityUseCase(repository, identity, clock),
             syncNow: supabase !== null ? new SyncNowUseCase(supabase, repository) : null,
             inspectionRepository,
@@ -226,7 +238,7 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
   const readyServices = state.phase === 'ready' ? state.services : null;
   useAutoSync({
     syncNow: readyServices?.syncNow ?? null,
-    supabase: readyServices?.supabase ?? null,
+    auth: readyServices?.auth ?? null,
   });
 
   if (state.phase === 'loading') {

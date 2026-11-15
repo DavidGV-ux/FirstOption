@@ -76,26 +76,28 @@ calidad de señal (SQI).
   falta de señal y se ofrecen recomendaciones de colocación del dedo.
 - La app no diagnostica arritmias, hipertensión ni hipoxia.
 
-## Regla de la linterna (inspección pupilar documentada)
+## Regla de la linterna (PLR y PPG)
 
-La linterna (Incremento 2+) existe para **iluminar durante una
-inspección pupilar** y permitir que la persona registre lo que observa.
-Límites activos:
+La pantalla de linterna ofrece **solo dos modos**: pulso óptico (PPG) y
+reflejo fotomotor pupilar (PLR). La captura pupilar asistida se retiró
+porque la estimación automática del tamaño pupilar no era fiable.
 
-- La luz **no mide, no analiza y no deriva ningún valor** (pupila,
-  reflejo, tiempo de reacción): no hay procesamiento de imagen y no se
-  capturan fotos, videos ni audio (`recordAudioAndroid: false`,
-  escáner de códigos deshabilitado; la vista de cámara no se muestra).
-- Lo único registrable es la descripción de la persona y una respuesta
-  explícita sobre el síntoma del catálogo v1
-  `symptom_visual_disturbance` (sí/no/no evaluado), guardada como
-  sesión con `source = 'pupil_inspection'`.
-- La inspección **no sustituye una exploración pupilar profesional**;
-  el registro describe, no diagnostica.
+- **PLR:** aplica un pulso de luz y solo calcula latencia, velocidades y
+  amplitud si se obtuvieron muestras reales de la pupila. Si no hay
+  muestras suficientes, se muestra «sin medición» y no se guarda nada.
+  **Nunca se usa una secuencia sintética para producir valores.**
+- Los resultados PLR son descriptivos y experimentales: no se clasifican
+  como «normal/retardado» ni se interpretan como fatiga, somnolencia o
+  alerta. No sustituyen una exploración pupilar profesional.
+- **PPG:** solo estima frecuencia cardíaca y calidad de señal. La presión
+  arterial y la SpO₂ no se miden, no se rellenan con valores normales y
+  no se guardan.
+- La app no diagnostica arritmias, hipertensión, hipoxia ni alteraciones
+  neurológicas.
 - El LED se apaga al salir de la pantalla y la cámara se desmonta al
   perder el foco.
 - Las pruebas automatizadas **no activan el flash ni la cámara**; solo
-  verifican la validación y el guardado de la documentación.
+  verifican validación, cálculo y guardado con datos de prueba.
 
 ## Escalas propias
 

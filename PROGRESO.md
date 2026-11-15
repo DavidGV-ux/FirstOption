@@ -4,12 +4,12 @@
 
 ### Incrementos completados
 - **Inc 1** — Registro manual diario, validación Zod, SQLite cifrado (SQLCipher), historial, reinicio sin pérdida.
-- **Inc 2** — Supabase Auth (email/contraseña, sesión en SecureStore), outbox transaccional (misma transacción que el guardado), push idempotente (`SyncNowUseCase`), per-user scoping local con adopción explícita, pantallas de acceso y sincronización.
+- **Inc 2** — Supabase Auth (email/contraseña, sesión en SecureStore), **cuenta local sin conexión** (creación/verificación en almacén seguro y vinculación automática a Supabase al recuperar internet), outbox transaccional (misma transacción que el guardado), push idempotente (`SyncNowUseCase`), **auto-sync** al recuperar conexión, al volver a primer plano y cada 2 minutos, per-user scoping local con adopción explícita, login obligatorio al abrir y pantallas de acceso/sincronización.
 - **Inc 3** — Dominio de laboratorio (paneles, resultados, documentos privados, basales versionados), conversión de unidades verificada, `SqliteLabRepository`, migración v3, pantalla `/laboratorio`, linterna de inspección pupilar documentada.
 - **Inc 4** — Análisis descriptivo puro, elegibilidad (datos insuficientes/no comparables/calidad/duplicados/método), tendencias por tiempo real, ejecuciones reproducibles (`analysis_runs` + inputs), basales versionadas, pantallas `/analisis` y `/basales`.
 
 ### En desarrollo (no cerrado)
-- **Inspección asistida por cámara (v6)** — dominio/casos de uso/infraestructura/presentación para captura guiada, métricas de calidad, estimación pupilar relativa experimental, comparación y persistencia local (`camera_inspection_*`, `SqliteInspectionRepository`). Incluye modo experimental de pulso óptico (PPG) con linterna: **solo estima frecuencia cardíaca** y calidad de señal; presión arterial y SpO₂ se muestran como «no medidas» y no se guardan. Selector de lente física en iOS cuando el sistema la expone (la principal queda por defecto para acercar el flash); en Android se declara la limitación. Todo marcado como experimental: **sin diagnóstico ni medición clínica validada**. Pendiente: validación en dispositivo, calibración/precisión, revisión de privacidad/consentimiento y cobertura de pruebas adicional.
+- **Inspección asistida por cámara (v6)** — dominio/casos de uso/infraestructura para captura guiada, métricas de calidad, comparación y persistencia local (`camera_inspection_*`, `SqliteInspectionRepository`). La UI de `/linterna` ofrece **solo dos modos**: reflejo fotomotor pupilar (PLR) y pulso óptico (PPG). La **captura pupilar asistida se retiró** por baja fiabilidad; el PLR solo muestra valores si hay muestras reales de la pupila (si no, «sin medición» y no guarda nada) y no clasifica fatiga ni alerta. El PPG **solo estima frecuencia cardíaca** y calidad de señal; presión arterial y SpO₂ se muestran como «no medidas» y no se guardan. Selector de lente física en iOS cuando el sistema la expone (la principal queda por defecto para acercar el flash); en Android se declara la limitación. Todo marcado como experimental: **sin diagnóstico ni medición clínica validada**. Pendiente: captura real de fotogramas para PLR, validación en dispositivo, calibración/precisión, revisión de privacidad/consentimiento y cobertura de pruebas adicional.
 
 ### Funcionalidades clave
 - Offline-first: UI consulta repositorios locales; guardado confirma sin esperar red.
@@ -57,7 +57,7 @@
 - `supabase/proposed-migrations/README.md` — instrucciones de aplicación.
 
 ### Pruebas
-- `test/unit/` — 73 pruebas (dominio, aplicación, sincronización, analítica, inspección por cámara, selección de lente y límites de PPG).
+- `test/unit/` — 89 pruebas (dominio, aplicación, autenticación offline, sincronización, analítica, inspección por cámara, selección de lente y límites de PPG).
 - `test/integration/sqlite.test.ts` — 9 pruebas sobre SQLite real (incluye migración v6, migración v7 e integridad de tablas de cámara).
 
 ### Documentación
@@ -68,7 +68,7 @@
 ### Incrementos pendientes
 - **Inc 5** — `ForecastProvider` (pronóstico de referencia naive + método lineal con intervalo de predicción real), evaluación con cortes progresivos (MAE/RMSE), model card.
 - **Inc 6** — Protocolos versionados, review events, exportación JSON, auditoría completa, accesibilidad final.
-- **Inc 2 cont.** — Auto-sync por conectividad/foreground con backoff+jitter, pull remoto con cursor de servidor.
+- **Inc 2 cont.** — Backoff+jitter en reintentos y pull remoto con cursor de servidor.
 - **Voz/pupila** — detrás de feature flags, estados honestos, sin diagnóstico.
 - **Datos demo** — sintéticos con banner permanente, seed reproducible.
 - **Docs** — analytics-methods, validation-plan, model cards, evidence actualizado.
@@ -91,7 +91,7 @@
 ## Comandos verificados (última actualización local)
 ```
 npx tsc --noEmit          # OK
-npx jest                  # 64 pruebas unitarias: OK
-npm run test:integration  # 8 pruebas de integración: OK
+npx jest                  # 89 pruebas unitarias: OK
+npm run test:integration  # 9 pruebas de integración: OK
 npx expo lint             # sin problemas
 ```

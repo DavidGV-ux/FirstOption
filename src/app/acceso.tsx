@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, Stack } from 'expo-router';
 import { FormError, PrimaryButton } from '@/presentation/components/screen';
@@ -38,66 +38,53 @@ export default function AccessScreen() {
     }
   }, []);
 
+  // Si ya hay sesión (remota o local), no tiene sentido quedarse aquí.
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const session = await services.auth.getSession();
+        if (active && session !== null) router.replace('/');
+      } catch {
+        // Sin sesión: se muestra el formulario.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [services.auth]);
+
   const submit = async () => {
     setBusy(true);
     setError(null);
     setInfo(null);
     try {
-      if (services.supabase === null) {
-        setError('Supabase no está configurado en esta compilación.');
+      const outcome =
+        mode === 'signin'
+          ? await services.auth.signIn(email, password)
+          : await services.auth.signUp(email, password, displayName);
+
+      if (!outcome.ok) {
+        setError(outcome.message);
         return;
       }
-      if (mode === 'signin') {
-        const { error: signInError } = await services.supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (signInError !== null) {
-          setError(mensajeAuth(signInError.message));
-          return;
-        }
-        router.back();
-      } else {
-        const { error: signUpError, data } = await services.supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: {
-              display_name: displayName.trim() || null,
-            },
-          },
-        });
-        if (signUpError !== null) {
-          setError(mensajeAuth(signUpError.message));
-          return;
-        }
-        // Guardar el nombre para mostrar localmente (funciona sin red).
+
+      if (mode === 'signup' && displayName.trim().length > 0) {
         await saveDisplayNameLocally(displayName.trim());
-        // Guardar en el perfil remoto de Supabase (tabla profiles).
-        if (services.supabase !== null && data.user?.id) {
-          try {
-            await services.supabase
-              .from('profiles')
-              .upsert({
-                id: data.user.id,
-                display_name: displayName.trim() || null,
-                updated_at: new Date().toISOString(),
-              })
-              .select();
-          } catch {
-            // No bloquear si falla el perfil remoto; el local ya se guardó.
-          }
-        }
-        if (data.session !== null) {
-          router.back();
-        } else {
-          setInfo(
-            'Revisa tu correo para confirmar la cuenta. Después podrás iniciar sesión.',
-          );
-        }
+      }
+
+      if (outcome.message !== undefined) {
+        setInfo(outcome.message);
+        // Dejar leer el aviso (cuenta local pendiente o correo por
+        // confirmar) antes de entrar al inicio.
+        setTimeout(() => router.replace('/'), 1200);
+      } else {
+        router.replace('/');
       }
     } catch {
-      setError('No se pudo contactar al servidor. Verifica tu conexión: los registros locales siguen guardados en el dispositivo.');
+      setError(
+        'No se pudo completar la operación. Los registros locales siguen guardados en el dispositivo.',
+      );
     } finally {
       setBusy(false);
     }
@@ -113,7 +100,9 @@ export default function AccessScreen() {
           <Text style={styles.title}>{mode === 'signin' ? 'Iniciar sesión' : 'Crear cuenta'}</Text>
           <Text style={styles.help}>
             La cuenta permite sincronizar con el servidor cuando haya
-            internet. Sin conexión, el registro local sigue funcionando.
+            internet. Si no tienes conexión, puedes crear la cuenta en este
+            dispositivo: se validará y subirá automáticamente al recuperar
+            internet. Los registros locales siguen funcionando sin cuenta.
           </Text>
           {mode === 'signup' && (
             <>
@@ -188,23 +177,6 @@ export default function AccessScreen() {
       </View>
     </>
   );
-}
-
-/** Mensajes de error de auth en español, sin exponer detalles técnicos. */
-function mensajeAuth(message: string): string {
-  if (message.includes('Invalid login credentials')) {
-    return 'Correo o contraseña incorrectos.';
-  }
-  if (message.includes('already registered')) {
-    return 'Ese correo ya está registrado. Inicia sesión.';
-  }
-  if (message.includes('Email not confirmed')) {
-    return 'Confirma tu correo antes de iniciar sesión.';
-  }
-  if (message.toLowerCase().includes('network')) {
-    return 'Sin conexión con el servidor. Inténtalo cuando haya internet.';
-  }
-  return 'No se pudo completar la operación. Inténtalo de nuevo.';
 }
 
 const styles = StyleSheet.create({

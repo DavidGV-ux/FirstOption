@@ -5,6 +5,7 @@ import { router, Stack, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { LatestLogStatus } from '@/application/use-cases/list-recent-activity';
 import type { SyncStatus } from '@/application/use-cases/sync-now';
+import type { AuthSession } from '@/application/use-cases/manage-auth';
 import { Card } from '@/presentation/components/ui';
 import { useAppServices } from './_providers';
 import { useResponsive } from '@/presentation/hooks/use-responsive';
@@ -20,7 +21,8 @@ export default function HomeScreen() {
   const [pending, setPending] = useState<{ sessions: number; observations: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [authState, setAuthState] = useState<'checking' | 'signed_in' | 'signed_out'>('checking');
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const [accountScope, setAccountScope] = useState<{ subjectId: string; kind: 'remote' | 'device'; email: string | null } | null>(null);
@@ -29,6 +31,26 @@ export default function HomeScreen() {
   const [displayName, setDisplayName] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    // La app abre siempre en el acceso: sin sesión (remota o local) no
+    // se muestra el inicio ni se leen datos.
+    let currentSession: AuthSession | null = null;
+    try {
+      currentSession = await services.auth.getSession();
+    } catch {
+      // Si no se puede comprobar la sesión, no se queda en una pantalla
+      // de carga: se muestra el acceso para reintentar.
+      setSession(null);
+      setSessionChecked(true);
+      router.replace('/acceso');
+      return;
+    }
+    setSession(currentSession);
+    setSessionChecked(true);
+    if (currentSession === null) {
+      router.replace('/acceso');
+      return;
+    }
+
     try {
       const [latest, pendingCount, scope, lc] = await Promise.all([
         services.listRecentActivity.latestLogStatus(),
@@ -42,13 +64,8 @@ export default function HomeScreen() {
       setLocalCount(lc);
       setError(null);
     } catch {
+      setSessionChecked(true);
       setError('No se pudieron leer los registros locales. Inténtalo de nuevo.');
-    }
-    if (services.supabase !== null) {
-      const { data } = await services.supabase.auth.getSession();
-      setAuthState(data.session !== null ? 'signed_in' : 'signed_out');
-    } else {
-      setAuthState('signed_out');
     }
   }, [services]);
 
@@ -99,9 +116,26 @@ export default function HomeScreen() {
       setSyncMessage('Sincronización no disponible en esta compilación.');
       return;
     }
-    if (authState !== 'signed_in') {
+    if (session === null) {
       setSyncMessage(null);
       setSyncMessage('Inicia sesión para sincronizar con el servidor.');
+      return;
+    }
+    if (session.kind !== 'remote') {
+      if (session.pendingRemoteUpload) {
+        setSyncMessage('Validando la cuenta local con el servidor…');
+        const outcome = await services.auth.reconcilePendingAccount();
+        setSyncMessage(
+          outcome.kind === 'no_pending'
+            ? 'No hay una cuenta local pendiente.'
+            : outcome.message,
+        );
+        await load();
+        return;
+      }
+      setSyncMessage(
+        'La cuenta aún no tiene sesión remota. Inicia sesión con internet para sincronizar.',
+      );
       return;
     }
     setSyncMessage(null);
@@ -126,23 +160,35 @@ export default function HomeScreen() {
         break;
     }
     await load();
-  }, [services, authState, load]);
+  }, [services, session, load]);
 
   const entry = status?.entry ?? null;
   const todayDone = status?.isToday === true;
   const pendingSessions = pending?.sessions ?? 0;
   const userInitials = displayName
     ? displayName.slice(0, 2).toUpperCase()
-    : accountScope?.email
-      ? accountScope.email.slice(0, 2).toUpperCase()
-      : 'FO';
+    : session?.email
+      ? session.email.slice(0, 2).toUpperCase()
+      : accountScope?.email
+        ? accountScope.email.slice(0, 2).toUpperCase()
+        : 'FO';
 
   const quickItems = [
     { title: 'Estado general', desc: 'Resumen de bienestar', route: '/estado' as const },
     { title: 'Historial', desc: 'Registros guardados', route: '/historial' as const },
     { title: 'Análisis', desc: 'Tendencias y estadísticas', route: '/analisis' as const },
-    { title: 'Linterna', desc: 'Inspección pupilar y pulso con linterna', route: '/linterna' as const },
+    { title: 'Linterna', desc: 'Reflejo pupilar y pulso con linterna', route: '/linterna' as const },
   ];
+
+  // Login primero: no se muestra el inicio hasta comprobar la sesión.
+  if (!sessionChecked || session === null) {
+    return (
+      <View style={styles.loadingScreen}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <Text style={styles.loadingText}>Abriendo tu espacio…</Text>
+      </View>
+    );
+  }
 
   return (
     <>
@@ -169,11 +215,7 @@ export default function HomeScreen() {
           </View>
           <View style={styles.topActions}>
             <Pressable accessibilityRole="button" accessibilityLabel="Tu cuenta" onPress={() => {
-              if (authState === 'signed_in') {
-                void router.push('/perfil');
-              } else {
-                void router.push('/acceso');
-              }
+              void router.push('/perfil');
             }} style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}>
               <Text style={styles.avatarText}>{userInitials}</Text>
             </Pressable>
@@ -188,17 +230,23 @@ export default function HomeScreen() {
           <View style={styles.pill}>
             <Text style={styles.pillText}>Datos protegidos</Text>
           </View>
-          {accountScope?.kind === 'remote' ? (
+          {session.kind === 'remote' ? (
             <View style={styles.pill}>
-              <Text style={styles.pillText} numberOfLines={1}>{accountScope.email ?? 'Cuenta activa'}</Text>
+              <Text style={styles.pillText} numberOfLines={1}>{session.email ?? 'Cuenta activa'}</Text>
             </View>
-          ) : null}
+          ) : (
+            <View style={styles.pill}>
+              <Text style={styles.pillText} numberOfLines={1}>
+                {session.pendingRemoteUpload ? 'Cuenta local pendiente' : 'Sesión local'}
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.welcome}>
           <Text style={styles.eyebrow}>Tu espacio de bienestar</Text>
           <Text style={styles.welcomeTitle} numberOfLines={2} ellipsizeMode="tail">
-            Hola{displayName ? `, ${displayName}` : accountScope?.email ? `, ${accountScope.email.split('@')[0]}` : ''}.
+            Hola{displayName ? `, ${displayName}` : session.email ? `, ${session.email.split('@')[0]}` : ''}.
           </Text>
           <Text style={styles.welcomeText}>
             Haz seguimiento de tu bienestar, registra tus mediciones y consulta tu evolución en un solo lugar.
@@ -275,15 +323,19 @@ export default function HomeScreen() {
             <Text style={styles.syncTitle}>Sincronización</Text>
             <Text style={styles.syncText}>
               {services.remoteConfigured
-                ? (authState === 'signed_in'
-                    ? (pendingSessions > 0 ? `${pendingSessions} registro(s) pendiente(s) de sincronizar` : 'Sin pendientes de sincronizar')
-                    : 'Inicia sesión para sincronizar')
+                ? session.kind === 'remote'
+                  ? (pendingSessions > 0 ? `${pendingSessions} registro(s) pendiente(s) de sincronizar` : 'Sin pendientes de sincronizar')
+                  : session.pendingRemoteUpload
+                    ? 'Cuenta local pendiente: se validará al recuperar internet'
+                    : 'Sesión local sin conexión remota'
                 : 'No configurada en esta compilación'}
             </Text>
           </View>
-          {services.remoteConfigured && authState === 'signed_in' ? (
+          {services.remoteConfigured && (session.kind === 'remote' || session.pendingRemoteUpload) ? (
             <Pressable accessibilityRole="button" onPress={() => void syncNow()} style={({ pressed }) => [styles.syncBtn, pressed && styles.pressed]}>
-              <Text style={styles.syncBtnText}>Sincronizar</Text>
+              <Text style={styles.syncBtnText}>
+                {session.kind === 'remote' ? 'Sincronizar' : 'Validar'}
+              </Text>
             </Pressable>
           ) : services.remoteConfigured ? (
             <Pressable accessibilityRole="button" onPress={() => router.push('/acceso')} style={({ pressed }) => [styles.syncBtn, pressed && styles.pressed]}>
@@ -293,47 +345,47 @@ export default function HomeScreen() {
         </View>
         {syncMessage ? <Text style={styles.syncMessage}>{syncMessage}</Text> : null}
 
-        {authState === 'signed_in' ? (
-          <Card title="Cuenta">
-            <Text style={styles.bodyText}>Sesión: {accountScope?.email ?? 'cuenta remota'}</Text>
-            {localCount > 0 ? (
-              <>
-                <Text style={styles.noteText}>Tienes {localCount} registro(s) locales sin asociar a tu cuenta.</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={async () => {
-                    try {
-                      const n = await services.manageAccount.adoptLocalRecords();
-                      setAdoptMsg(`Se asociaron ${n} registro(s) a tu cuenta.`);
-                      await load();
-                    } catch (e) {
-                      setAdoptMsg(e instanceof Error ? e.message : 'No se pudo asociar. Inténtalo de nuevo.');
-                    }
-                  }}
-                  style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
-                >
-                  <Text style={styles.secondaryBtnText}>Asociar registros locales</Text>
-                </Pressable>
-              </>
-            ) : null}
-            {adoptMsg ? <Text style={styles.noteText}>{adoptMsg}</Text> : null}
-            <Pressable
-              accessibilityRole="button"
-              onPress={async () => {
-                if (services.supabase !== null) await services.supabase.auth.signOut();
-                setAdoptMsg(null);
-                await load();
-              }}
-              style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
-            >
-              <Text style={styles.secondaryBtnText}>Cerrar sesión</Text>
-            </Pressable>
-          </Card>
-        ) : (
-          <Pressable accessibilityRole="button" onPress={() => router.push('/acceso')} style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}>
-            <Text style={styles.secondaryBtnText}>Iniciar sesión / crear cuenta</Text>
+        <Card title="Cuenta">
+          <Text style={styles.bodyText}>
+            {session.kind === 'remote'
+              ? `Sesión remota: ${session.email ?? 'cuenta activa'}`
+              : session.pendingRemoteUpload
+                ? `Cuenta local pendiente: ${session.email ?? 'sin correo'}`
+                : `Sesión local: ${session.email ?? 'sin correo'}`}
+          </Text>
+          {localCount > 0 && session.kind === 'remote' ? (
+            <>
+              <Text style={styles.noteText}>Tienes {localCount} registro(s) locales sin asociar a tu cuenta.</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={async () => {
+                  try {
+                    const n = await services.manageAccount.adoptLocalRecords();
+                    setAdoptMsg(`Se asociaron ${n} registro(s) a tu cuenta.`);
+                    await load();
+                  } catch (e) {
+                    setAdoptMsg(e instanceof Error ? e.message : 'No se pudo asociar. Inténtalo de nuevo.');
+                  }
+                }}
+                style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
+              >
+                <Text style={styles.secondaryBtnText}>Asociar registros locales</Text>
+              </Pressable>
+            </>
+          ) : null}
+          {adoptMsg ? <Text style={styles.noteText}>{adoptMsg}</Text> : null}
+          <Pressable
+            accessibilityRole="button"
+            onPress={async () => {
+              await services.auth.signOut();
+              setAdoptMsg(null);
+              router.replace('/acceso');
+            }}
+            style={({ pressed }) => [styles.secondaryBtn, pressed && styles.pressed]}
+          >
+            <Text style={styles.secondaryBtnText}>Cerrar sesión</Text>
           </Pressable>
-        )}
+        </Card>
 
         <Text style={styles.disclaimer}>
           firstOption es una herramienta de registro y seguimiento personal. No sustituye la valoración, el diagnóstico ni las recomendaciones de un profesional de salud.
@@ -345,6 +397,14 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: palette.background },
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: palette.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  loadingText: { ...typography.body, color: palette.textSecondary },
   content: { paddingBottom: spacing.xxl, gap: spacing.md },
   topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },

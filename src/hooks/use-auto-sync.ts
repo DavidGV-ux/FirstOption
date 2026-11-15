@@ -1,68 +1,113 @@
-import { useEffect, useRef, useCallback } from 'react';
-import NetInfo from '@react-native-community/netinfo';
+import { useCallback, useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
+import NetInfo, { type NetInfoState } from '@react-native-community/netinfo';
+import type {
+  AuthSession,
+  ReconcileOutcome,
+} from '@/application/use-cases/manage-auth';
+import type { SyncStatus } from '@/application/use-cases/sync-now';
+
+/** Espera breve para no sincronizar con una red aún inestable. */
+const DEBOUNCE_MS = 1500;
+/** Verificación periódica aunque NetInfo no emita cambios. */
+const DEFAULT_INTERVAL_MS = 120_000;
+
+interface SyncNowLike {
+  execute(): Promise<SyncStatus>;
+}
+
+interface AuthLike {
+  getSession(): Promise<AuthSession | null>;
+  reconcilePendingAccount(): Promise<ReconcileOutcome>;
+}
 
 /**
- * Hook que sincroniza automáticamente cuando se recupera la conexión a internet.
+ * Sincronización automática.
  *
- * Reglas:
- * - Solo sincroniza si hay sesión remota activa y syncNow está configurado.
- * - Espera 2 segundos tras detectar conexión para evitar sincronizaciones
- *   precipitadas si la red es inestable (debounce).
- * - Nunca sobrescribe datos: usa el mismo flujo idempotente de sync-now.
- * - Los errores de sync automático se silencian (no interrumpen la UI).
+ * - Al recuperar internet: valida una cuenta local pendiente y luego
+ *   empuja la cola de sincronización.
+ * - Verifica la conexión cada 2 minutos y al volver la app a primer plano.
+ * - Nunca bloquea la UI: los errores se silencian y el botón manual de
+ *   Sincronizar sigue disponible.
+ * - Solo empuja datos con sesión remota; una cuenta local pendiente
+ *   primero debe quedar vinculada en Supabase.
  */
 export function useAutoSync({
   syncNow,
-  supabase,
+  auth,
+  intervalMs = DEFAULT_INTERVAL_MS,
 }: {
-  syncNow: { execute: () => Promise<unknown> } | null;
-  supabase: { auth: { getSession: () => Promise<{ data: { session: { user: { id: string } | null } | null } }> } } | null;
+  syncNow: SyncNowLike | null;
+  auth: AuthLike | null;
+  intervalMs?: number;
 }) {
-  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const runningRef = useRef(false);
 
-  const scheduleSync = useCallback(() => {
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
-    }
-    syncTimeoutRef.current = setTimeout(async () => {
-      try {
-        if (syncNow === null || supabase === null) {
-          return;
-        }
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (!sessionData?.session) {
-          return;
-        }
-        await syncNow.execute();
-      } catch {
-        // Errores de sync automático no se muestran al usuario;
-        // el botón manual de Sincronizar sigue disponible.
-      } finally {
-        syncTimeoutRef.current = null;
+  const runSync = useCallback(async () => {
+    if (auth === null || runningRef.current) return;
+    runningRef.current = true;
+    try {
+      let session = await auth.getSession();
+      if (session === null) return;
+
+      if (session.pendingRemoteUpload) {
+        const outcome = await auth.reconcilePendingAccount();
+        if (outcome.kind !== 'linked') return;
+        session = await auth.getSession();
       }
-    }, 2000);
-  }, [syncNow, supabase]);
+
+      // Sin sesión remota no se puede empujar: la cuenta local (o una
+      // cuenta pendiente de confirmar correo) no tiene token válido.
+      if (session === null || session.kind !== 'remote') return;
+      if (syncNow === null) return;
+      await syncNow.execute();
+    } catch {
+      // Un fallo de sincronización automática no interrumpe la app.
+    } finally {
+      runningRef.current = false;
+    }
+  }, [auth, syncNow]);
+
+  const scheduleSync = useCallback(
+    (delayMs = DEBOUNCE_MS) => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        void runSync();
+      }, delayMs);
+    },
+    [runSync],
+  );
 
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener((state) => {
-      const connected = state.isInternetReachable === true;
-      if (connected) {
-        scheduleSync();
-      }
-    });
+    const onNetworkState = (state: NetInfoState) => {
+      const connected =
+        state.isConnected === true && state.isInternetReachable !== false;
+      if (connected) scheduleSync();
+    };
 
-    // Comprobar conectividad inicial al montar.
-    NetInfo.fetch().then((state) => {
-      if (state.isInternetReachable === true) {
-        scheduleSync();
-      }
+    const unsubscribe = NetInfo.addEventListener(onNetworkState);
+
+    const checkNow = () => {
+      NetInfo.fetch().then(onNetworkState).catch(() => undefined);
+    };
+
+    // Verificación inicial al montar.
+    checkNow();
+    const interval = setInterval(checkNow, intervalMs);
+    const appStateSubscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') checkNow();
     });
 
     return () => {
       unsubscribe();
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
+      clearInterval(interval);
+      appStateSubscription.remove();
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
     };
-  }, [scheduleSync]);
+  }, [scheduleSync, intervalMs]);
 }

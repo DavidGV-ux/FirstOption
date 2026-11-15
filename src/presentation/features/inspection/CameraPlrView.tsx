@@ -42,6 +42,7 @@ export function CameraPlrView({ missionPhase, onSaved }: CameraPlrViewProps) {
   // Muestras y resultado
   const samplesRef = useRef<PlrTimePoint[]>([]);
   const [result, setResult] = useState<PlrResult | null>(null);
+  const [captureMessage, setCaptureMessage] = useState<string | null>(null);
 
   // Guardado
   const [saving, setSaving] = useState(false);
@@ -58,6 +59,7 @@ export function CameraPlrView({ missionPhase, onSaved }: CameraPlrViewProps) {
   const startPlrTest = useCallback(() => {
     if (isRunning) return;
     setResult(null);
+    setCaptureMessage(null);
     setSavedSuccess(null);
     setSaveError(null);
     samplesRef.current = [];
@@ -111,15 +113,17 @@ export function CameraPlrView({ missionPhase, onSaved }: CameraPlrViewProps) {
         setIsRunning(false);
         setCurrentPhase('completed');
 
-        // Si tenemos muestras reales usamos esas, si no generamos la secuencia del protocolo
-        let finalSamples = samplesRef.current;
-        if (finalSamples.length < 15) {
-          finalSamples = processor.generateSyntheticSequence({
-            baselineRatio: 0.52,
-            latencyMs: 250,
-            constrictionAmplitudePct: 38.0,
-            sampleRateHz: 30,
-          });
+        // Nunca se inventan muestras: sin fotogramas reales de la pupila
+        // no hay resultado cuantitativo.
+        const finalSamples = samplesRef.current;
+        if (finalSamples.length < 10) {
+          setResult(null);
+          setCaptureMessage(
+            'No se capturaron muestras reales de la pupila durante la prueba. ' +
+              'Esta compilación no genera valores PLR a partir de una secuencia simulada; ' +
+              'no se muestra ni se guarda ningún resultado.',
+          );
+          return;
         }
 
         const evaluated = processor.evaluate(finalSamples, eyeSide);
@@ -323,34 +327,26 @@ export function CameraPlrView({ missionPhase, onSaved }: CameraPlrViewProps) {
         </View>
       )}
 
+      {/* Sin muestras reales no se muestra ni se guarda un resultado. */}
+      {captureMessage && (
+        <View style={[cardStyle, styles.limitationsBox]}>
+          <Text style={styles.limitationsTitle}>Sin medición disponible</Text>
+          <Text style={styles.limitationsText}>{captureMessage}</Text>
+        </View>
+      )}
+
       {/* Resultados cuantitativos si la prueba finalizó */}
       {result && (
         <View style={[cardStyle, styles.resultCard]}>
           <View style={styles.resultHeaderRow}>
             <Text style={styles.resultTitle}>
-              Resultado: Reflejo Fotomotor ({result.eyeSide === 'left' ? 'Ojo Izquierdo' : 'Ojo Derecho'})
+              Registro PLR (experimental): {result.eyeSide === 'left' ? 'Ojo Izquierdo' : 'Ojo Derecho'}
             </Text>
-            <View
-              style={[
-                styles.statusBadge,
-                result.interpretation === 'prompt'
-                  ? styles.statusBadgeSuccess
-                  : result.interpretation === 'delayed'
-                    ? styles.statusBadgeAttention
-                    : styles.statusBadgeSluggish,
-              ]}
-            >
-              <Text style={styles.statusBadgeText}>
-                {result.interpretation === 'prompt'
-                  ? 'Reactivo / Ágil'
-                  : result.interpretation === 'delayed'
-                    ? 'Retardado'
-                    : result.interpretation === 'sluggish'
-                      ? 'Perezoso'
-                      : 'Inconcluso'}
-              </Text>
-            </View>
           </View>
+          <Text style={styles.limitationsText}>
+            Valores calculados a partir de las muestras capturadas. No se
+            comparan con umbrales clínicos ni evalúan fatiga o alerta.
+          </Text>
 
           {/* Gráfico representativo de la curva temporal */}
           <View style={styles.curvePlotContainer}>
@@ -391,9 +387,7 @@ export function CameraPlrView({ missionPhase, onSaved }: CameraPlrViewProps) {
                 {result.latencyMs !== null ? `${result.latencyMs} ms` : 'N/D'}
               </Text>
               <Text style={styles.metricHint}>
-                {result.latencyMs !== null && result.latencyMs <= 350
-                  ? 'Rango fisiológico ágil (200-350 ms)'
-                  : 'Latencia prolongada (sugiere fatiga del SNC)'}
+                Tiempo desde el estímulo hasta el inicio de la caída
               </Text>
             </View>
 
@@ -422,20 +416,6 @@ export function CameraPlrView({ missionPhase, onSaved }: CameraPlrViewProps) {
               <Text style={styles.metricValue}>{result.constrictionAmplitudePercent}%</Text>
               <Text style={styles.metricHint}>Reducción máxima de ratio</Text>
             </View>
-          </View>
-
-          {/* Evaluación funcional de fatiga neurológica */}
-          <View style={styles.assessmentBox}>
-            <Text style={styles.assessmentTitle}>Evaluación de Alerta / Fatiga Central</Text>
-            <Text style={styles.assessmentBody}>
-              {result.neurologicalFatigueAssessment === 'low_fatigue'
-                ? '🟢 Nivel de alerta adecuado: latencia y velocidades dentro de parámetros normales sin signos de retraso neurovegetativo.'
-                : result.neurologicalFatigueAssessment === 'moderate_fatigue'
-                  ? '🟡 Fatiga central moderada: respuesta pupilar con leve aumento de latencia o constricción pausada; sugiere somnolencia o sobrecarga.'
-                  : result.neurologicalFatigueAssessment === 'high_fatigue'
-                    ? '🔴 Alerta disminuida: latencia marcadamente prolongada (> 420 ms), compatible con deprivación severa de sueño o fatiga cognitiva.'
-                    : '⚪ Señal no clasificable con suficiente certeza.'}
-            </Text>
           </View>
 
           {/* Limitaciones */}

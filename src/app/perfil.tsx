@@ -34,7 +34,15 @@ export default function PerfilScreen() {
       const localName = await SecureStore.getItemAsync(DISPLAY_NAME_KEY);
       if (localName) setDisplayName(localName);
 
-      if (services.supabase !== null) {
+      const session = await services.auth.getSession();
+      if (session?.email) {
+        setEmail(session.email);
+      }
+      if (!localName && session?.displayName) {
+        setDisplayName(session.displayName);
+      }
+
+      if (services.supabase !== null && session?.kind === 'remote') {
         const { data: sessionData } = await services.supabase.auth.getSession();
         const user = sessionData?.session?.user;
         if (user) {
@@ -94,8 +102,8 @@ export default function PerfilScreen() {
   const signOut = useCallback(async () => {
     setBusy(true);
     try {
-      if (services.supabase !== null) await services.supabase.auth.signOut();
-      router.replace('/');
+      await services.auth.signOut();
+      router.replace('/acceso');
     } catch {
       setError('No se pudo cerrar sesión.');
     } finally {

@@ -138,7 +138,10 @@ export default function RegisterScreen() {
         setSaved(
           `Registro guardado en el dispositivo (${result.observationCount} medición(es)). Sin sincronizar todavía.`,
         );
-        setTimeout(() => router.back(), 900);
+        // Evitar que el borrador rellene un registro nuevo por accidente.
+        void SecureStore.deleteItemAsync(DRAFT_KEY).catch(() => undefined);
+        // Volver al inicio de la app tras guardar.
+        setTimeout(() => router.replace('/'), 900);
       } catch (error) {
         if (error instanceof ValidationError) {
           for (const [field, message] of Object.entries(error.fieldErrors)) {
