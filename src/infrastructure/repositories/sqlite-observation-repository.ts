@@ -11,8 +11,15 @@ import type {
   SessionWithObservations,
 } from '@/domain/repositories/observation-repository';
 import type { OutboxRow, SyncOutboxStore } from '@/domain/repositories/sync-outbox';
+import type {
+  RemoteHistoryImportResult,
+  RemoteHistoryImporter,
+  RemoteObservationSnapshot,
+  RemoteSessionSnapshot,
+} from '@/domain/repositories/remote-history';
 import type { MetricDefinition } from '@/domain/metrics/metric-definition';
 import type { SqlDriver } from '../database/driver';
+import { localDateFromIso } from '@/application/use-cases/register-daily-log';
 
 interface SessionRow {
   session_id: string;
@@ -112,7 +119,7 @@ function mapMetric(row: MetricRow): MetricDefinition {
  * `sync_outbox` en la MISMA transacción (offline-first): guardar una
  * medición y encolarla para sincronizar es una única operación atómica.
  */
-export class SqliteObservationRepository implements ObservationRepository, SyncOutboxStore {
+export class SqliteObservationRepository implements ObservationRepository, SyncOutboxStore, RemoteHistoryImporter {
   constructor(private readonly driver: SqlDriver) {}
 
   async saveSessionWithObservations(
@@ -291,12 +298,14 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
 
   async adoptSubjectScope(fromSubjectId: string, toSubjectId: string): Promise<number> {
     if (fromSubjectId === toSubjectId) return 0;
+    let adopted = 0;
     // Adoptar sesiones (y sus observaciones siguen enlazadas por session_id).
     await this.driver.withTransaction(async () => {
-      await this.driver.run(
+      const sessions = await this.driver.run(
         `UPDATE measurement_sessions SET subject_id = ? WHERE subject_id = ?`,
         [toSubjectId, fromSubjectId],
       );
+      adopted = sessions.changes;
       // Laboratorio (si existe la tabla).
       try {
         await this.driver.run(
@@ -323,11 +332,7 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
         // Ignorar si la tabla no existe.
       }
     });
-    const row = await this.driver.getFirst<{ n: number }>(
-      `SELECT COUNT(*) AS n FROM measurement_sessions WHERE subject_id = ?`,
-      [toSubjectId],
-    );
-    return row?.n ?? 0;
+    return adopted;
   }
 
   async countRecordsBySubject(subjectId: string): Promise<number> {
@@ -343,6 +348,119 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
       `SELECT * FROM metric_definitions ORDER BY category, metric_id`,
     );
     return rows.map(mapMetric);
+  }
+
+  // ------------------------------------------------------------------
+  // Importación del historial remoto (descarga)
+  // ------------------------------------------------------------------
+
+  /**
+   * Importa sesiones y observaciones descargadas de Supabase.
+   *
+   * Garantías:
+   * - Idempotente: `INSERT OR IGNORE` con los ids deterministas
+   *   (`client_request_id` remoto = id local). Repetir la descarga no
+   *   duplica filas.
+   * - No sobrescribe: si la fila local ya existe se conserva tal cual.
+   * - No inventa datos: una observación con métrica desconocida, sesión
+   *   ausente o fecha inválida se descarta y se cuenta.
+   * - No encola nada en `sync_outbox`: estas filas ya están en el
+   *   servidor; se guardan como `synced`.
+   */
+  async importRemoteHistory(input: {
+    sessions: readonly RemoteSessionSnapshot[];
+    observations: readonly RemoteObservationSnapshot[];
+  }): Promise<RemoteHistoryImportResult> {
+    const metricRows = await this.driver.getAll<{ metric_id: string }>(
+      'SELECT metric_id FROM metric_definitions',
+    );
+    const knownMetrics = new Set(metricRows.map((row) => row.metric_id));
+
+    let sessionsImported = 0;
+    let observationsImported = 0;
+    let observationsSkipped = 0;
+
+    await this.driver.withTransaction(async () => {
+      for (const snapshot of input.sessions) {
+        let recordedLocalDate: string;
+        try {
+          recordedLocalDate = localDateFromIso(snapshot.startedAt);
+        } catch {
+          continue;
+        }
+        const result = await this.driver.run(
+          `INSERT OR IGNORE INTO measurement_sessions
+             (session_id, subject_id, mission_phase, recorded_at, recorded_local_date,
+              source, note, sync_state, created_at, remote_user_id, client_request_id)
+           VALUES (?, ?, ?, ?, ?, 'remote_import', NULL, 'synced', ?, ?, ?)`,
+          [
+            snapshot.localSessionId,
+            snapshot.subjectId,
+            snapshot.missionPhase,
+            snapshot.startedAt,
+            recordedLocalDate,
+            snapshot.createdAt,
+            snapshot.subjectId,
+            snapshot.localSessionId,
+          ],
+        );
+        if (result.changes > 0) sessionsImported += 1;
+      }
+
+      // Solo se importan observaciones cuya sesión exista realmente en
+      // local (recién importada o previamente guardada en el dispositivo).
+      const referencedSessionIds = [
+        ...new Set(input.observations.map((obs) => obs.localSessionId)),
+      ];
+      const subjectBySession = new Map<string, string>();
+      for (const chunk of chunkArray(referencedSessionIds, 400)) {
+        const placeholders = chunk.map(() => '?').join(', ');
+        const rows = await this.driver.getAll<{ session_id: string; subject_id: string }>(
+          `SELECT session_id, subject_id FROM measurement_sessions
+           WHERE session_id IN (${placeholders})`,
+          chunk,
+        );
+        for (const row of rows) subjectBySession.set(row.session_id, row.subject_id);
+      }
+
+      for (const obs of input.observations) {
+        const subjectId = subjectBySession.get(obs.localSessionId);
+        if (subjectId === undefined || !knownMetrics.has(obs.metricId)) {
+          observationsSkipped += 1;
+          continue;
+        }
+        let localDate: string;
+        try {
+          localDate = localDateFromIso(obs.observedAt);
+        } catch {
+          observationsSkipped += 1;
+          continue;
+        }
+        const result = await this.driver.run(
+          `INSERT OR IGNORE INTO observations
+             (observation_id, session_id, metric_id, value_original, unit_original,
+              value_normalized, unit_normalized, observed_at, local_date,
+              quality_state, sync_state, created_at, remote_user_id, client_request_id)
+           VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, 'synced', ?, ?, ?)`,
+          [
+            obs.localObservationId,
+            obs.localSessionId,
+            obs.metricId,
+            obs.valueOriginal,
+            obs.unitOriginal,
+            obs.observedAt,
+            localDate,
+            obs.qualityState,
+            obs.createdAt,
+            subjectId,
+            obs.localObservationId,
+          ],
+        );
+        if (result.changes > 0) observationsImported += 1;
+      }
+    });
+
+    return { sessionsImported, observationsImported, observationsSkipped };
   }
 
   // ------------------------------------------------------------------
@@ -407,4 +525,12 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
       [key, value, new Date().toISOString()],
     );
   }
+}
+
+function chunkArray<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
 }

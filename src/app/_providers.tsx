@@ -1,11 +1,13 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
@@ -13,6 +15,7 @@ import {
 } from '@/application/use-cases/register-daily-log';
 import { ListRecentActivityUseCase } from '@/application/use-cases/list-recent-activity';
 import { SyncNowUseCase } from '@/application/use-cases/sync-now';
+import { PullRemoteHistoryUseCase } from '@/application/use-cases/pull-remote-history';
 import { DocumentPupilInspectionUseCase } from '@/application/use-cases/document-pupil-inspection';
 import { ManageAccountScopeUseCase } from '@/application/use-cases/manage-account';
 import { ManageAuthUseCase } from '@/application/use-cases/manage-auth';
@@ -40,7 +43,8 @@ import { SecureLocalAccountStore } from '@/infrastructure/security/local-account
 import { ExpoPasswordHasher } from '@/infrastructure/security/expo-password-hasher';
 import {
   LocalSubjectIdentity,
-  type RemoteSubjectProvider,
+  SessionAwareRemoteSubject,
+  type RemoteSubjectWithEmail,
 } from '@/infrastructure/security/local-subject-identity';
 import { SupabaseAuthAdapter } from '@/infrastructure/supabase/supabase-auth-adapter';
 import { CryptoIdGenerator } from '@/infrastructure/ids/uuid-generator';
@@ -70,6 +74,7 @@ interface AppServices {
   runTrendAnalysis: RunTrendAnalysisUseCase;
   listRecentActivity: ListRecentActivityUseCase;
   syncNow: SyncNowUseCase | null;
+  pullRemoteHistory: PullRemoteHistoryUseCase | null;
   inspectionRepository: SqliteInspectionRepository;
   startCameraInspection: StartCameraInspectionUseCase;
   captureInspectionFrame: CaptureInspectionFrameUseCase;
@@ -108,6 +113,24 @@ type BootState =
  */
 export function AppServicesProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<BootState>({ phase: 'loading' });
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showNotice = useCallback((message: string) => {
+    setNotice(message);
+    if (noticeTimer.current !== null) clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => {
+      noticeTimer.current = null;
+      setNotice(null);
+    }, 9000);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (noticeTimer.current !== null) clearTimeout(noticeTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -136,7 +159,8 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
             supabase = null;
           }
         }
-        const remoteSubject: (RemoteSubjectProvider & { getEmail(): Promise<string | null> }) | null =
+        const accountStore = new SecureLocalAccountStore();
+        const liveRemoteSubject: RemoteSubjectWithEmail | null =
           supabase === null
             ? null
             : {
@@ -149,9 +173,16 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
                   return data.session?.user?.email ?? null;
                 },
               };
+        // La identidad cae al `remoteUserId` local cuando la sesión de
+        // Supabase no puede leerse (sin red o token expirado), para que
+        // el historial remoto siga visible al reabrir la app.
+        const remoteSubject: RemoteSubjectWithEmail | null =
+          liveRemoteSubject === null
+            ? null
+            : new SessionAwareRemoteSubject(liveRemoteSubject, accountStore);
         const identity = new LocalSubjectIdentity(opened.driver, remoteSubject);
         const auth = new ManageAuthUseCase(
-          new SecureLocalAccountStore(),
+          accountStore,
           supabase === null ? null : new SupabaseAuthAdapter(supabase),
           new ExpoPasswordHasher(),
           clock,
@@ -184,6 +215,8 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
             auth,
             listRecentActivity: new ListRecentActivityUseCase(repository, identity, clock),
             syncNow: supabase !== null ? new SyncNowUseCase(supabase, repository) : null,
+            pullRemoteHistory:
+              supabase !== null ? new PullRemoteHistoryUseCase(supabase, repository) : null,
             inspectionRepository,
             startCameraInspection: new StartCameraInspectionUseCase(identity, clock, ids),
             captureInspectionFrame: new CaptureInspectionFrameUseCase(cameraCapture),
@@ -242,7 +275,10 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
   const readyServices = state.phase === 'ready' ? state.services : null;
   useAutoSync({
     syncNow: readyServices?.syncNow ?? null,
+    pullRemoteHistory: readyServices?.pullRemoteHistory ?? null,
+    manageAccount: readyServices?.manageAccount ?? null,
     auth: readyServices?.auth ?? null,
+    onNotice: showNotice,
   });
 
   if (state.phase === 'loading') {
@@ -257,6 +293,19 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
     <AppServicesContext.Provider value={state.services}>
       <View style={styles.root}>
         {!state.encrypted && <UnencryptedModeBanner />}
+        {notice !== null && (
+          <View style={styles.notice} accessible accessibilityRole="alert">
+            <Text style={styles.noticeText}>{notice}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar aviso"
+              onPress={() => setNotice(null)}
+              hitSlop={8}
+            >
+              <Text style={styles.noticeClose}>×</Text>
+            </Pressable>
+          </View>
+        )}
         <View style={styles.root}>{children}</View>
       </View>
     </AppServicesContext.Provider>
@@ -308,6 +357,19 @@ const styles = {
     fontWeight: '600',
     textAlign: 'center',
   },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    backgroundColor: palette.surfaceAlt,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  noticeText: { ...typography.secondary, color: palette.textPrimary, flex: 1 },
+  noticeClose: { fontSize: 20, color: palette.textSecondary, paddingHorizontal: spacing.xs },
   blocked: {
     flex: 1,
     backgroundColor: palette.background,

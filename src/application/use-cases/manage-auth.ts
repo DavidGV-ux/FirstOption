@@ -206,8 +206,8 @@ export class ManageAuthUseCase {
         pendingRemoteUpload: local.pendingRemoteUpload,
       },
       message: local.pendingRemoteUpload
-        ? 'Sesión local iniciada. La cuenta se validará al recuperar internet.'
-        : 'Sesión local iniciada sin conexión.',
+        ? 'Sesión local iniciada. La cuenta se validará y los datos se sincronizarán al recuperar internet.'
+        : 'Sesión local iniciada sin conexión. Tu historial y registros se sincronizarán al recuperar internet.',
     };
   }
 

@@ -6,12 +6,34 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { LatestLogStatus } from '@/application/use-cases/list-recent-activity';
 import type { SyncStatus } from '@/application/use-cases/sync-now';
 import type { AuthSession } from '@/application/use-cases/manage-auth';
+import type { PullStatus } from '@/application/use-cases/pull-remote-history';
 import { Card } from '@/presentation/components/ui';
 import { useAppServices } from './_providers';
 import { useResponsive } from '@/presentation/hooks/use-responsive';
 import { palette, radius, spacing, typography } from '@/presentation/theme/tokens';
 
 const DISPLAY_NAME_KEY = 'firstOption_display_name';
+
+/** Mensaje honesto para el resultado de una descarga remota. */
+function pullStatusMessage(status: PullStatus): string {
+  switch (status.kind) {
+    case 'pulled': {
+      if (status.sessions === 0 && status.observations === 0) {
+        return 'Historial al día con el servidor.';
+      }
+      const skipped =
+        status.skipped > 0
+          ? ` ${status.skipped} registro(s) sin datos válidos no se importaron.`
+          : '';
+      return `Historial actualizado: ${status.sessions} sesión(es), ${status.observations} medición(es).${skipped}`;
+    }
+    case 'not_authenticated':
+      return 'La sesión remota no está activa. Inicia sesión con internet para descargar tu historial.';
+    case 'offline':
+    case 'remote_error':
+      return status.message;
+  }
+}
 
 export default function HomeScreen() {
   const services = useAppServices();
@@ -30,7 +52,7 @@ export default function HomeScreen() {
   const [adoptMsg, setAdoptMsg] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { pull?: boolean }) => {
     // La app abre siempre en el acceso: sin sesión (remota o local) no
     // se muestra el inicio ni se leen datos.
     let currentSession: AuthSession | null = null;
@@ -49,6 +71,24 @@ export default function HomeScreen() {
     if (currentSession === null) {
       router.replace('/acceso');
       return;
+    }
+
+    // Descarga remota: solo con sesión remota. Es idempotente y nunca
+    // sobrescribe lo local. Sin red devuelve un estado honesto.
+    if (
+      options?.pull === true &&
+      currentSession.kind === 'remote' &&
+      services.pullRemoteHistory !== null
+    ) {
+      setSyncMessage('Actualizando tu historial con el servidor…');
+      try {
+        const pulled = await services.pullRemoteHistory.execute();
+        setSyncMessage(pullStatusMessage(pulled));
+      } catch {
+        setSyncMessage(
+          'No se pudo descargar el historial. Los datos locales siguen guardados en el dispositivo.',
+        );
+      }
     }
 
     try {
@@ -99,19 +139,19 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void load();
+      void load({ pull: true });
       void loadDisplayName();
     }, [load, loadDisplayName]),
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await load();
+    await load({ pull: true });
     setRefreshing(false);
   }, [load]);
 
   const syncNow = useCallback(async () => {
-    if (services.syncNow === null) {
+    if (services.syncNow === null && services.pullRemoteHistory === null) {
       setSyncMessage(null);
       setSyncMessage('Sincronización no disponible en esta compilación.');
       return;
@@ -121,10 +161,22 @@ export default function HomeScreen() {
       setSyncMessage('Inicia sesión para sincronizar con el servidor.');
       return;
     }
-    if (session.kind !== 'remote') {
+
+    const hasRemoteAccount = session?.kind === 'remote' || accountScope?.kind === 'remote';
+    if (!hasRemoteAccount) {
       if (session.pendingRemoteUpload) {
         setSyncMessage('Validando la cuenta local con el servidor…');
         const outcome = await services.auth.reconcilePendingAccount();
+        if (outcome.kind === 'linked') {
+          const adopted = await services.manageAccount.adoptLocalRecords().catch(() => 0);
+          setSyncMessage(
+            adopted > 0
+              ? `${outcome.message} Se asociaron ${adopted} registro(s) locales a tu cuenta.`
+              : outcome.message,
+          );
+          await load({ pull: true });
+          return;
+        }
         setSyncMessage(
           outcome.kind === 'no_pending'
             ? 'No hay una cuenta local pendiente.'
@@ -138,33 +190,47 @@ export default function HomeScreen() {
       );
       return;
     }
-    setSyncMessage(null);
+
     setSyncMessage('Sincronizando…');
-    const result: SyncStatus = await services.syncNow.execute();
-    switch (result.kind) {
-      case 'synced':
-        setSyncMessage(
-          result.pushed === 0
-            ? 'Nada pendiente de sincronizar.'
-            : `Sincronizadas ${result.pushed} operación(es). Pendientes: ${result.remaining}.`,
-        );
-        break;
-      case 'not_authenticated':
-        setSyncMessage('La sesión remota expiró. Vuelve a iniciar sesión cuando haya internet.');
-        break;
-      case 'offline':
-        setSyncMessage('Sin conexión: los datos siguen guardados en el dispositivo.');
-        break;
-      case 'remote_error':
-        setSyncMessage(result.message);
-        break;
+    let pullStatus: PullStatus | null = null;
+    if (services.pullRemoteHistory !== null) {
+      pullStatus = await services.pullRemoteHistory.execute();
     }
+    let pushStatus: SyncStatus | null = null;
+    if (session.kind === 'remote' && services.syncNow !== null) {
+      pushStatus = await services.syncNow.execute();
+    }
+
+    const parts: string[] = [];
+    if (pullStatus !== null) parts.push(pullStatusMessage(pullStatus));
+    if (pushStatus !== null) {
+      switch (pushStatus.kind) {
+        case 'synced':
+          parts.push(
+            pushStatus.pushed === 0
+              ? 'Nada pendiente de subir.'
+              : `Sincronizadas ${pushStatus.pushed} operación(es). Pendientes: ${pushStatus.remaining}.`,
+          );
+          break;
+        case 'not_authenticated':
+          parts.push('La sesión remota expiró. Vuelve a iniciar sesión cuando haya internet.');
+          break;
+        case 'offline':
+          parts.push('Sin conexión: los datos siguen guardados en el dispositivo.');
+          break;
+        case 'remote_error':
+          parts.push(pushStatus.message);
+          break;
+      }
+    }
+    setSyncMessage(parts.join(' ') || null);
     await load();
-  }, [services, session, load]);
+  }, [services, session, accountScope, load]);
 
   const entry = status?.entry ?? null;
   const todayDone = status?.isToday === true;
   const pendingSessions = pending?.sessions ?? 0;
+  const hasRemoteAccount = session?.kind === 'remote' || accountScope?.kind === 'remote';
   const userInitials = displayName
     ? displayName.slice(0, 2).toUpperCase()
     : session?.email
@@ -325,16 +391,18 @@ export default function HomeScreen() {
               {services.remoteConfigured
                 ? session.kind === 'remote'
                   ? (pendingSessions > 0 ? `${pendingSessions} registro(s) pendiente(s) de sincronizar` : 'Sin pendientes de sincronizar')
-                  : session.pendingRemoteUpload
-                    ? 'Cuenta local pendiente: se validará al recuperar internet'
-                    : 'Sesión local sin conexión remota'
+                  : accountScope?.kind === 'remote'
+                    ? 'Sin conexión: tu historial se sincronizará al recuperar internet'
+                    : session.pendingRemoteUpload
+                      ? 'Cuenta local pendiente: se validará al recuperar internet'
+                      : 'Sesión local sin conexión remota'
                 : 'No configurada en esta compilación'}
             </Text>
           </View>
-          {services.remoteConfigured && (session.kind === 'remote' || session.pendingRemoteUpload) ? (
+          {services.remoteConfigured && (hasRemoteAccount || session.pendingRemoteUpload) ? (
             <Pressable accessibilityRole="button" onPress={() => void syncNow()} style={({ pressed }) => [styles.syncBtn, pressed && styles.pressed]}>
               <Text style={styles.syncBtnText}>
-                {session.kind === 'remote' ? 'Sincronizar' : 'Validar'}
+                {hasRemoteAccount ? 'Sincronizar' : 'Validar'}
               </Text>
             </Pressable>
           ) : services.remoteConfigured ? (

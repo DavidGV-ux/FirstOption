@@ -12,14 +12,15 @@ Prototipo móvil de seguimiento longitudinal (contextos análogos, bienestar y r
 |---|---|
 | Registro manual diario (ánimo, estrés, fatiga, sueño, síntomas, FC, PA, SpO₂, nota) | ✅ Implementado, con pruebas unitarias |
 | Validación de entrada con reglas puras (Zod + reglas de dominio) | ✅ Implementado |
-| SQLite cifrado (SQLCipher) con migraciones versionadas (v1–v6) | ✅ Implementado, 8 pruebas de integración sobre SQLite real |
+| SQLite cifrado (SQLCipher) con migraciones versionadas (v1–v8) | ✅ Implementado, 10 pruebas de integración sobre SQLite real |
 | Historial y último registro con antigüedad | ✅ Implementado |
 | Persistencia tras reinicio | ✅ Verificado con SQLite real en pruebas |
 | Modo Expo Go (SQLite plano explícito, base separada, banner permanente) | ✅ Implementado; pendiente de verificación en dispositivo |
 | Autenticación Supabase (email + contraseña, sesión en SecureStore) | ✅ Implementado |
 | Alcance por cuenta: los datos locales de una cuenta no se mezclan con los de otra | ✅ Implementado (scoping por `subject_id` + adopción explícita de registros del dispositivo) |
-| Sincronización Supabase (outbox transaccional + push idempotente) | ✅ Implementado; **requiere aplicar el modelo remoto** (`supabase/proposed-migrations/`) |
-| Auto-sync por conectividad, foreground y verificación periódica | ✅ Implementado (valida cuentas locales pendientes y empuja el outbox; pull remoto con cursor de servidor sigue pendiente) |
+| Sincronización Supabase (outbox transaccional, push y pull idempotentes) | ✅ Implementado; **requiere aplicar el modelo remoto** (`supabase/proposed-migrations/`) |
+| Auto-sync por conectividad, foreground y verificación periódica | ✅ Implementado (valida cuentas locales pendientes, descarga historial remoto y empuja el outbox) |
+| Historial remoto visible tras cerrar y reabrir la app | ✅ Implementado: sesión persistida en fragmentos seguros + descarga remota al iniciar sesión |
 | Hematología: panel de laboratorio, unidades originales y convertidas, fecha de toma/reporte, laboratorio, muestra, método, intervalo de referencia, estado de verificación | ✅ Implementado (`/laboratorio`) |
 | Documentos privados del laboratorio (metadatos + copia en sandbox privado con SHA-256) | ✅ Infraestructura implementada; falta la captura en UI |
 | Líneas basales versionadas (periodo, método, observaciones de origen, estado) | ✅ Implementado (`/basales`) |
@@ -45,17 +46,20 @@ Detalle del avance en [`PROGRESO.md`](PROGRESO.md).
   en Expo Go, SQLite plano en una base separada con aviso permanente.
   La clave va en Keychain/Keystore (`expo-secure-store`).
 - Supabase con clave publicable (RLS, sin secret keys en el cliente),
-  sesión persistida en SecureStore, outbox local transaccional y push
-  idempotente (`SyncNowUseCase`).
+  sesión persistida en SecureStore **en fragmentos** (evita el límite de
+  tamaño de algunos dispositivos), outbox local transaccional, push
+  idempotente (`SyncNowUseCase`) y pull idempotente
+  (`PullRemoteHistoryUseCase`).
 - `expo-file-system` para los documentos privados del laboratorio
   (copia al sandbox de la app + digest SHA-256 real de los bytes).
 - React Hook Form + Zod.
 - Sistema de diseño responsivo (1 columna en móvil, 2 en tablet) con
   tokens de color verificados y foco en accesibilidad.
-- Pruebas: Jest (89 unitarias: dominio, aplicación, sincronización,
-  autenticación offline, analítica, inspección por cámara) + SQLite real
-  con `node:sqlite` (9 de integración: migraciones, persistencia,
-  integridad, outbox, cámara).
+- Pruebas: Jest (107 unitarias: dominio, aplicación, sincronización,
+  pull/importación remota, identidad con respaldo offline, autenticación,
+  analítica, inspección por cámara) + SQLite real con `node:sqlite`
+  (10 de integración: migraciones, persistencia, integridad, outbox,
+  cámara).
 
 ## Requisitos
 
@@ -107,9 +111,14 @@ se bloquea con un mensaje explícito.
 - Sin sesión remota, la app usa un **alcance local del dispositivo**:
   los datos se guardan igual (offline-first) y el auto-sync los empuja
   en cuanto la cuenta queda vinculada.
-- Al iniciar sesión, los registros del dispositivo **no** se reasignan
-  solos: la app muestra cuántos hay y ofrece una acción explícita para
-  asociarlos a la cuenta.
+- Si la sesión de Supabase no puede leerse (sin internet o token
+  expirado), la identidad cae al `remoteUserId` de la cuenta local
+  vinculada. Así el historial remoto sigue visible al reabrir la app sin
+  conexión, sin mezclar cuentas y sin dejarlo visible tras cerrar sesión.
+- Al vincular automáticamente una cuenta local pendiente, los registros
+  del dispositivo se asocian a esa cuenta y la app informa cuántos se
+  asociaron (no es silencioso). En los demás inicios de sesión, la
+  adopción sigue siendo una acción explícita.
 - Dos cuentas que usan el mismo dispositivo no ven los datos de la otra:
   todas las lecturas locales filtran por el alcance activo.
 - Una contraseña guardada temporalmente para crear la cuenta sin
@@ -119,28 +128,34 @@ se bloquea con un mensaje explícito.
 
 1. Crea la cuenta o inicia sesión (también puede crearse sin conexión).
 2. Registra tu seguimiento (funciona igual sin conexión).
-3. El auto-sync revisa la conexión al recuperarla, al volver la app a
-   primer plano y cada 2 minutos; valida una cuenta local pendiente y
-   empuja el outbox (sesiones antes que observaciones).
-4. "Sincronizar ahora" sigue disponible para forzar el push. Los fallos
-   quedan visibles y se reintentan; nada se descarta sin confirmación del
-   servidor.
+3. Al abrir la app con sesión remota, se **descarga** el historial del
+   servidor (sesiones y observaciones) antes de mostrar los datos. La
+   descarga es idempotente: no duplica ni sobrescribe filas locales, y
+   descarta —contándolas— las observaciones que no se pueden mapear con
+   honestidad (sin valor real, métrica desconocida o sesión ausente).
+4. El auto-sync revisa la conexión al recuperarla, al volver la app a
+   primer plano y cada 2 minutos; valida una cuenta local pendiente,
+   descarga el historial remoto y empuja el outbox (sesiones antes que
+   observaciones).
+5. "Sincronizar ahora" sigue disponible para forzar pull + push. Los
+   fallos quedan visibles y se reintentan; nada se descarta sin
+   confirmación del servidor.
+6. Sin internet, la app permite entrar con la cuenta local y avisa que el
+   historial y los registros se sincronizarán al recuperar conexión.
 
-**Pendiente de tu acción:** el esquema remoto aún no está aplicado; hasta
-que se ejecute `supabase/proposed-migrations/000_supabase_model_v2.sql`
-(o los archivos `0001…0005`), el push reporta "Tabla no disponible"
-(honesto) y los datos siguen guardados en el dispositivo. Instrucciones
-en [`supabase/proposed-migrations/README.md`](supabase/proposed-migrations/README.md).
-El auto-sync al recuperar conexión y el pull remoto llegan en la
-continuación del Incremento 2.
+**Requisito remoto:** hasta que se ejecute
+`supabase/proposed-migrations/000_supabase_model_v2.sql` (o los archivos
+`0001…0005`), el push/pull reporta "Tabla no disponible" (honesto) y los
+datos siguen guardados en el dispositivo. Instrucciones en
+[`supabase/proposed-migrations/README.md`](supabase/proposed-migrations/README.md).
 
 ## Comandos (verificados en este repositorio)
 
 ```bash
 npm install
 npx tsc --noEmit          # verificación de tipos: OK
-npx jest                  # 64 pruebas unitarias: OK
-npm run test:integration  # 8 pruebas de integración con SQLite real: OK
+npx jest                  # 107 pruebas unitarias: OK
+npm run test:integration  # 10 pruebas de integración con SQLite real: OK
 npx expo lint             # sin problemas
 npx expo-doctor           # 20/20 comprobaciones OK (última ejecución registrada)
 

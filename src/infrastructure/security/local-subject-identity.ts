@@ -6,6 +6,73 @@ export interface RemoteSubjectProvider {
   getUserId(): Promise<string | null>;
 }
 
+export interface RemoteSubjectWithEmail extends RemoteSubjectProvider {
+  getEmail(): Promise<string | null>;
+}
+
+/** Datos mínimos de la cuenta/sesión local para el respaldo offline. */
+export interface LocalIdentityFallbackStore {
+  loadAccount(): Promise<{ email: string; remoteUserId: string | null } | null>;
+  loadSession(): Promise<{ email: string } | null>;
+}
+
+/**
+ * Identidad remota con respaldo local.
+ *
+ * Con internet y sesión de Supabase válida usa la sesión viva. Si la
+ * sesión no puede leerse (sin red, token expirado, SecureStore lento),
+ * cae al `remoteUserId` de la cuenta local SOLO si existe una sesión de
+ * dispositivo iniciada para ese mismo correo. Así el historial remoto
+ * sigue visible sin conexión, pero cerrar sesión no deja datos abiertos.
+ */
+export class SessionAwareRemoteSubject implements RemoteSubjectWithEmail {
+  constructor(
+    private readonly live: RemoteSubjectWithEmail,
+    private readonly fallback: LocalIdentityFallbackStore,
+  ) {}
+
+  async getUserId(): Promise<string | null> {
+    try {
+      const liveId = await this.live.getUserId();
+      if (liveId !== null) return liveId;
+    } catch {
+      // Sin red o almacenamiento no disponible: se intenta el respaldo.
+    }
+    const account = await this.fallbackAccount();
+    return account?.remoteUserId ?? null;
+  }
+
+  async getEmail(): Promise<string | null> {
+    try {
+      const liveEmail = await this.live.getEmail();
+      if (liveEmail !== null) return liveEmail;
+    } catch {
+      // Se intenta el respaldo local.
+    }
+    const account = await this.fallbackAccount();
+    return account?.email ?? null;
+  }
+
+  private async fallbackAccount(): Promise<{
+    email: string;
+    remoteUserId: string | null;
+  } | null> {
+    try {
+      const [account, session] = await Promise.all([
+        this.fallback.loadAccount(),
+        this.fallback.loadSession(),
+      ]);
+      if (account === null || session === null) return null;
+      if (account.email.trim().toLowerCase() !== session.email.trim().toLowerCase()) {
+        return null;
+      }
+      return account;
+    } catch {
+      return null;
+    }
+  }
+}
+
 export interface SubjectIdentityLike {
   /** Identidad efectiva: cuenta remota si hay sesión, si no el scope local. */
   getOrCreateSubjectId(): Promise<string>;

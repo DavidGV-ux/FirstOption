@@ -6,6 +6,7 @@ import type {
   ReconcileOutcome,
 } from '@/application/use-cases/manage-auth';
 import type { SyncStatus } from '@/application/use-cases/sync-now';
+import type { PullStatus } from '@/application/use-cases/pull-remote-history';
 
 /** Espera breve para no sincronizar con una red aún inestable. */
 const DEBOUNCE_MS = 1500;
@@ -16,6 +17,14 @@ interface SyncNowLike {
   execute(): Promise<SyncStatus>;
 }
 
+interface PullRemoteHistoryLike {
+  execute(): Promise<PullStatus>;
+}
+
+interface AccountLike {
+  adoptLocalRecords(): Promise<number>;
+}
+
 interface AuthLike {
   getSession(): Promise<AuthSession | null>;
   reconcilePendingAccount(): Promise<ReconcileOutcome>;
@@ -24,21 +33,28 @@ interface AuthLike {
 /**
  * Sincronización automática.
  *
- * - Al recuperar internet: valida una cuenta local pendiente y luego
- *   empuja la cola de sincronización.
+ * - Al recuperar internet: valida una cuenta local pendiente, asocia sus
+ *   registros al nuevo alcance remoto (reportando el número), descarga el
+ *   historial remoto y luego empuja la cola de sincronización.
  * - Verifica la conexión cada 2 minutos y al volver la app a primer plano.
  * - Nunca bloquea la UI: los errores se silencian y el botón manual de
  *   Sincronizar sigue disponible.
- * - Solo empuja datos con sesión remota; una cuenta local pendiente
+ * - Solo descarga/empuja con sesión remota; una cuenta local pendiente
  *   primero debe quedar vinculada en Supabase.
  */
 export function useAutoSync({
   syncNow,
+  pullRemoteHistory = null,
+  manageAccount = null,
   auth,
+  onNotice,
   intervalMs = DEFAULT_INTERVAL_MS,
 }: {
   syncNow: SyncNowLike | null;
+  pullRemoteHistory?: PullRemoteHistoryLike | null;
+  manageAccount?: AccountLike | null;
   auth: AuthLike | null;
+  onNotice?: (message: string) => void;
   intervalMs?: number;
 }) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -54,12 +70,24 @@ export function useAutoSync({
       if (session.pendingRemoteUpload) {
         const outcome = await auth.reconcilePendingAccount();
         if (outcome.kind !== 'linked') return;
+        // La cuenta ya existe en Supabase: los registros hechos en este
+        // dispositivo pasan al alcance remoto. Se informa el número, no
+        // se reasigna en silencio.
+        if (manageAccount !== null) {
+          const adopted = await manageAccount.adoptLocalRecords().catch(() => 0);
+          if (adopted > 0) {
+            onNotice?.(`Se asociaron ${adopted} registro(s) locales a tu cuenta.`);
+          }
+        }
         session = await auth.getSession();
       }
 
-      // Sin sesión remota no se puede empujar: la cuenta local (o una
-      // cuenta pendiente de confirmar correo) no tiene token válido.
+      // Sin sesión remota no se puede descargar ni empujar: la cuenta
+      // local (o una pendiente de confirmar correo) no tiene token.
       if (session === null || session.kind !== 'remote') return;
+      if (pullRemoteHistory !== null) {
+        await pullRemoteHistory.execute();
+      }
       if (syncNow === null) return;
       await syncNow.execute();
     } catch {
@@ -67,7 +95,7 @@ export function useAutoSync({
     } finally {
       runningRef.current = false;
     }
-  }, [auth, syncNow]);
+  }, [auth, manageAccount, onNotice, pullRemoteHistory, syncNow]);
 
   const scheduleSync = useCallback(
     (delayMs = DEBOUNCE_MS) => {

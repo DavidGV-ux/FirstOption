@@ -137,7 +137,15 @@ export function calculatePlrMetrics(
   const baseVariance =
     baselineRatios.reduce((sum, r) => sum + (r - baselineRatio) ** 2, 0) / baselineRatios.length;
   const baseStdDev = Math.sqrt(baseVariance);
-  const minDropMagnitude = Math.max(0.005, Math.min(baselineRatio * 0.015, baseStdDev * 2));
+  // La caída mínima debe superar el ruido de la fase basal. Se exige al
+  // menos un 1,5% del ratio basal: suficiente para ignorar
+  // micro-fluctuaciones (p. ej. ±1%) sin retrasar la detección en
+  // capturas limpias. La desviación se usa como piso adicional.
+  const minDropMagnitude = Math.max(
+    0.005,
+    baselineRatio * 0.015,
+    Math.min(baselineRatio * 0.02, baseStdDev),
+  );
   const onsetDropThreshold = baselineRatio - minDropMagnitude;
   let onsetIndex = -1;
 
