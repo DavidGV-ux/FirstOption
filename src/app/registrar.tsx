@@ -561,8 +561,8 @@ function formatDateTime(d: Date): string {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: palette.background },
-  content: { padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md },
-  gap: { gap: spacing.sm },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
+  gap: { gap: spacing.md },
   disclaimer: { ...typography.small, color: palette.textSecondary, lineHeight: 18 },
   sectionTitle: { ...typography.subtitle, color: palette.textPrimary },
   helper: { ...typography.secondary, color: palette.textSecondary },
@@ -581,14 +581,15 @@ const styles = StyleSheet.create({
   phaseLabel: { ...typography.secondary, color: palette.textPrimary },
   phaseLabelSelected: { color: palette.accent, fontWeight: '600' },
   scaleOption: {
-    width: 96,
+    flex: 1,
+    minWidth: 70,
     padding: spacing.sm,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: palette.border,
     backgroundColor: palette.surface,
     alignItems: 'center',
-    gap: 2,
+    gap: 4,
   },
   scaleOptionSelected: { borderColor: palette.accent, backgroundColor: 'rgba(53,109,120,0.10)' },
   scaleValue: { ...typography.subtitle, color: palette.textPrimary },
