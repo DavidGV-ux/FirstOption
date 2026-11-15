@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   buttonLabel: {
     ...typography.body,
     fontWeight: '600',
-    color: palette.accentOnSurface,
+    color: '#FFFFFF',
   },
   buttonLabelDisabled: { color: palette.textSecondary },
   empty: {
@@ -164,11 +164,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
-  chipAttention: { borderColor: palette.attention, backgroundColor: 'rgba(138,90,23,0.08)' },
+  chipAttention: { borderColor: palette.attention, backgroundColor: `${palette.attention}14` },
   chipText: { ...typography.small, color: palette.textSecondary },
   chipTextAttention: { color: palette.attention, fontWeight: '600' },
   errorBox: {
-    backgroundColor: 'rgba(163,52,58,0.08)',
+    backgroundColor: `${palette.priority}14`,
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: palette.priority,

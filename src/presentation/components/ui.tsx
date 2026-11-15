@@ -73,6 +73,44 @@ export function SecondaryButton({
   );
 }
 
+/** Acción primaria (fondo azul, texto blanco). */
+export function PrimaryButton({
+  label,
+  onPress,
+  disabled,
+  busy,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  busy?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      disabled={disabled || busy}
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          minHeight: 44,
+          borderRadius: 14,
+          backgroundColor: palette.accent,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: (disabled || busy) ? 0.5 : pressed ? 0.9 : 1,
+        },
+      ]}
+    >
+      <Text style={{ ...typography.secondary, color: '#FFFFFF', fontWeight: '700' }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 /** Campo con etiqueta, ayuda y error. */
 export function Field({
   label,
@@ -218,7 +256,7 @@ export function OfflineBanner() {
       accessible
       accessibilityRole="alert"
       style={{
-        backgroundColor: 'rgba(240,184,75,0.10)',
+        backgroundColor: 'rgba(255,181,71,0.10)',
         borderBottomWidth: 1,
         borderBottomColor: palette.attention,
         paddingHorizontal: spacing.md,
@@ -257,25 +295,10 @@ export function SyncStatusCard({
       </Text>
       {configured ? (
         signedIn ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Sincronizar ahora con el servidor"
+          <PrimaryButton
+            label="Sincronizar ahora"
             onPress={onSync}
-            style={{
-              minHeight: 48,
-              alignSelf: 'flex-start',
-              borderRadius: radius.sm,
-              borderWidth: 1,
-              borderColor: palette.accent,
-              paddingHorizontal: spacing.md,
-              paddingVertical: spacing.sm,
-              justifyContent: 'center',
-            }}
-          >
-            <Text style={{ ...typography.secondary, color: '#071321', fontWeight: '700' }}>
-              Sincronizar ahora
-            </Text>
-          </Pressable>
+          />
         ) : (
           <Pressable
             accessibilityRole="button"

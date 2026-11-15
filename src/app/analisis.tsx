@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
   eligibilityState: { ...typography.secondary, color: palette.accent, fontWeight: '600' },
   hintText: { ...typography.small, color: palette.textSecondary, marginTop: spacing.xs },
   errorBox: {
-    backgroundColor: 'rgba(232,121,121,0.12)',
+    backgroundColor: `${palette.priority}14`,
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: palette.priority,
