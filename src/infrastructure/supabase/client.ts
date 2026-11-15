@@ -1,27 +1,54 @@
+import { Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 
 /**
- * Cliente Supabase con clave PUBLISHABLE. Nunca se usan secret keys ni
- * service_role en el cliente; toda la autorización se resuelve con RLS.
- *
- * La sesión se persiste en SecureStore (Keychain/Keystore) para que el
- * usuario siga autenticado entre ejecuciones. Sin conexión, la app
- * sigue leyendo/escribiendo localmente: NO se promete re-autenticación
- * remota sin internet.
+ * Adaptador de almacenamiento de sesión.
+ * - Nativo: expo-secure-store (Keychain/Keystore).
+ * - Web: localStorage (expo-secure-store es un stub vacío en web y
+ *   lanzaría "getValueWithKeyAsync is not a function"). La web es solo
+ *   para desarrollo/preview; la sesión no queda protegida por el SO.
  */
+const SUPABASE_SESSION_KEY = 'orbita_salud_supabase_session_v1';
+
 export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 export const SUPABASE_PUBLISHABLE_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
-const SUPABASE_SESSION_KEY = 'orbita_salud_supabase_session_v1';
-
-/** Adaptador de almacenamiento de sesión sobre expo-secure-store. */
 export const secureStoreAuthStorage = {
-  getItem: (key: string) => SecureStore.getItemAsync(key),
-  setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
-  removeItem: (key: string) => SecureStore.deleteItemAsync(key),
+  getItem: async (key: string): Promise<string | null> => {
+    if (Platform.OS === 'web') {
+      try {
+        return window.localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    }
+    return SecureStore.getItemAsync(key);
+  },
+  setItem: async (key: string, value: string): Promise<void> => {
+    if (Platform.OS === 'web') {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch {
+        // Sin almacenamiento disponible en web: no bloqueamos la app.
+      }
+      return;
+    }
+    await SecureStore.setItemAsync(key, value);
+  },
+  removeItem: async (key: string): Promise<void> => {
+    if (Platform.OS === 'web') {
+      try {
+        window.localStorage.removeItem(key);
+      } catch {
+        // Sin almacenamiento disponible en web: no bloqueamos la app.
+      }
+      return;
+    }
+    await SecureStore.deleteItemAsync(key);
+  },
 };
 
 let client: SupabaseClient | null = null;
