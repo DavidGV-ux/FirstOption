@@ -105,12 +105,8 @@ export class SyncNowUseCase {
       throw new Error('Cliente Supabase ausente');
     }
     const raw = JSON.parse(row.payload) as Record<string, unknown>;
-    // TEMP-DIAG: payload crudo del outbox antes de adaptar.
-    console.log('[DIAG sync] pushOne', row.outbox_id, row.entity_type, 'rawPayload=', JSON.stringify(raw));
     const adapted = this.adaptPayloadForRemote(row.entity_type, row.entity_id, raw, userId);
     const table = adapted.table;
-    // TEMP-DIAG: metric_code que se enviará al remoto.
-    console.log('[DIAG sync] pushOne', row.outbox_id, '-> metric_code=', adapted.payload.metric_code, 'table=', table);
     const { error } = await this.supabase.from(table).upsert(adapted.payload, {
       onConflict: adapted.onConflict,
     });

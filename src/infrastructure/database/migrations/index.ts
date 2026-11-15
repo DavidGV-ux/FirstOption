@@ -133,17 +133,15 @@ export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 async function applyKnownDataRepairs(driver: SqlDriver): Promise<void> {
   // symptom_nauseas -> symptom_nausea (legacy). Seguro e idempotente.
   // Corre el outbox legacy aunque user_version ya sea 7 (app no recargada tras v7).
-  const obsRes = await driver.run(
+  await driver.run(
     `UPDATE observations SET metric_id = 'symptom_nausea' WHERE metric_id = 'symptom_nauseas'`,
   );
-  const outboxRes = await driver.run(
+  await driver.run(
     `UPDATE sync_outbox SET payload = replace(payload, 'symptom_nauseas', 'symptom_nausea'),
          state = CASE WHEN state IN ('pending', 'failed') THEN 'pending' ELSE state END,
          last_error = CASE WHEN state IN ('pending', 'failed') THEN NULL ELSE last_error END
      WHERE payload LIKE '%symptom_nauseas%'`,
   );
-  // TEMP-DIAG: reparación de datos legacy al abrir.
-  console.log('[DIAG sync] applyKnownDataRepairs observationsChanged=', obsRes.changes, 'outboxChanged=', outboxRes.changes);
 }
 
 /** Aplica migraciones pendientes de forma idempotente. */

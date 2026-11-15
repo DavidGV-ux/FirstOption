@@ -107,8 +107,6 @@ export default function HomeScreen() {
     setSyncMessage(null);
     setSyncMessage('Sincronizando…');
     const result: SyncStatus = await services.syncNow.execute();
-    // TEMP-DIAG: resultado final de la sincronización.
-    console.log('[DIAG sync] syncNow.execute result=', JSON.stringify(result));
     switch (result.kind) {
       case 'synced':
         setSyncMessage(

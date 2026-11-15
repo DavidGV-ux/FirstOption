@@ -68,8 +68,6 @@ export async function openAppDatabase(
     // Modo Expo Go explícito: base separada, sin clave, aviso visible.
     const driver: SqlDriver = new ExpoSqlDriver(db);
     const schemaVersion = await migrateIfNeeded(driver);
-    // TEMP-DIAG: esquema al abrir (Expo Go / sin cifrado).
-    console.log('[DIAG sync] open database schemaVersion=', schemaVersion, 'encrypted=false');
     return { driver, schemaVersion, cipherVersion: null, encrypted: false };
   }
 
@@ -80,7 +78,5 @@ export async function openAppDatabase(
 
   const driver: SqlDriver = new ExpoSqlDriver(db);
   const schemaVersion = await migrateIfNeeded(driver);
-  // TEMP-DIAG: esquema al abrir (cifrado).
-  console.log('[DIAG sync] open database schemaVersion=', schemaVersion, 'encrypted=true');
   return { driver, schemaVersion, cipherVersion, encrypted: true };
 }
