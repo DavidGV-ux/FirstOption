@@ -6,6 +6,7 @@ import { Card } from '@/presentation/components/ui';
 import { useAppServices } from './_providers';
 import { windowSummary, slopePerDay } from '@/domain/analytics/descriptive';
 import { evaluateEligibility } from '@/domain/analytics/eligibility';
+import { isExternalReferenceSource } from '@/domain/observations/observation';
 import type { SessionWithObservations } from '@/domain/repositories/observation-repository';
 import { palette, radius, spacing, typography, cardStyle } from '@/presentation/theme/tokens';
 
@@ -103,7 +104,7 @@ export default function AnalisisScreen() {
   const load = useCallback(async () => {
     try {
       const sessions = await services.listRecentActivity.listRecentSessions(200);
-      setStats(compute(sessions));
+      setStats(compute(sessions.filter((s) => !isExternalReferenceSource(s.session.source))));
       setError(null);
     } catch {
       setError('No se pudieron leer los registros para el análisis.');

@@ -206,6 +206,43 @@ describe('ListRecentActivityUseCase', () => {
     expect(status.entry?.age.kind).toBe('hours');
   });
 
+  it('ignora datasets externos de referencia (NASA OSDR) en el resumen personal', async () => {
+    const repo = new InMemoryRepository();
+    const external: MeasurementSession = {
+      sessionId: 'osd575-c001-plus1',
+      subjectId: 'subject-1',
+      missionPhase: 'postflight',
+      recordedAt: '2026-11-14T12:00:00.000Z',
+      recordedLocalDate: '2026-11-14',
+      source: 'nasa_osdr_osd575',
+      note: 'NASA OSDR OSD-575',
+      syncState: 'local_only',
+      createdAt: '2026-11-14T12:00:00.000Z',
+    };
+    repo.sessions.push(external);
+    repo.observationsBySession.set('osd575-c001-plus1', [
+      {
+        observationId: 'osd575-c001-plus1:glucose',
+        sessionId: 'osd575-c001-plus1',
+        metricId: 'glucose',
+        valueOriginal: 95,
+        unitOriginal: 'mg/dL',
+        valueNormalized: null,
+        unitNormalized: null,
+        observedAt: '2026-11-14T12:00:00.000Z',
+        localDate: '2026-11-14',
+        qualityState: 'ok',
+        syncState: 'local_only',
+        createdAt: '2026-11-14T12:00:00.000Z',
+      },
+    ]);
+    const useCase = new ListRecentActivityUseCase(repo, { getOrCreateSubjectId: async () => 'subject-1' }, clock);
+    const status = await useCase.latestLogStatus();
+    expect(status.entry).toBeNull();
+    const list = await useCase.listRecent(10);
+    expect(list).toHaveLength(0);
+  });
+
   it('resume valores con unidades visibles', async () => {
     const repo = new InMemoryRepository();
     const useCase = new RegisterDailyLogUseCase(repo, { getOrCreateSubjectId: async () => 's' }, clock, ids);

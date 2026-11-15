@@ -2,6 +2,7 @@ import type { Clock } from '@/domain/shared/clock';
 import type { IdGenerator } from '@/domain/shared/ids';
 import type { ObservationRepository, SubjectIdentityStore } from '@/domain/repositories/observation-repository';
 import type { AnalysisRunRepository } from '@/domain/repositories/analysis-repository';
+import { isExternalReferenceSource } from '@/domain/observations/observation';
 import { computeTrend } from '@/domain/analytics/trends';
 
 export interface RunTrendAnalysisInput {
@@ -30,8 +31,10 @@ export class RunTrendAnalysisUseCase {
     const subjectId = await this.identity.getOrCreateSubjectId();
     const cutoffAt = input.cutoffAt ?? this.clock.nowIso();
     const sessions = await this.observations.listRecentSessions(500, subjectId);
+    // Los datasets externos de referencia (NASA OSDR) nunca entran en el análisis personal.
+    const personal = sessions.filter((s) => !isExternalReferenceSource(s.session.source));
 
-    const points = sessions
+    const points = personal
       .flatMap((s) => s.observations)
       .filter((o) => o.metricId === input.metricId && Date.parse(o.observedAt) <= Date.parse(cutoffAt))
       .map((o) => ({ at: o.observedAt, value: o.valueOriginal }));
@@ -43,7 +46,7 @@ export class RunTrendAnalysisUseCase {
     if (result.observationCount < 2) status = 'insufficient_data';
     else if (result.slopePerDay === null) status = 'inconclusive';
 
-    const inputs = sessions
+    const inputs = personal
       .flatMap((s) => s.observations)
       .filter((o) => o.metricId === input.metricId && Date.parse(o.observedAt) <= Date.parse(cutoffAt))
       .map((o) => ({

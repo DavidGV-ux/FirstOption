@@ -9,6 +9,7 @@ import type { SessionWithObservations } from '@/domain/repositories/observation-
 import { evaluateMetricRange, statusColor, statusLabelEs } from '@/domain/analytics/health-ranges';
 import { Osd575Service } from '@/infrastructure/nasa-osdr/osd-575-service';
 import type { Inspiration4CrewId } from '@/infrastructure/nasa-osdr/osd-575-data';
+import { isExternalReferenceSource } from '@/domain/observations/observation';
 import { getMetricDefinition } from '@/domain/metrics/catalog-v1';
 
 type TrendPoint = { at: string; value: number };
@@ -283,12 +284,23 @@ export default function EstadoGeneralScreen() {
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
-  const wellbeing = useMemo(() => buildMetricViews(sessions, WELLBEING), [sessions]);
-  const vitals = useMemo(() => buildMetricViews(sessions, VITALS), [sessions]);
-  const symptoms = useMemo(() => buildMetricViews(sessions, SYMPTOMS), [sessions]);
-  const hema = useMemo(() => buildMetricViews(sessions, HEMA), [sessions]);
-  const metabolic = useMemo(() => buildMetricViews(sessions, CMP_OSDR), [sessions]);
-  const allKey = useMemo(() => [...wellbeing, ...vitals, ...hema, ...metabolic], [wellbeing, vitals, hema, metabolic]);
+  // El dataset NASA OSDR es referencia externa: no cuenta como tus
+  // registros ni aparece en el resumen personal de salud.
+  const personalSessions = useMemo(
+    () => sessions.filter((s) => !isExternalReferenceSource(s.session.source)),
+    [sessions],
+  );
+  const referenceSessions = useMemo(
+    () => sessions.filter((s) => isExternalReferenceSource(s.session.source)),
+    [sessions],
+  );
+
+  const wellbeing = useMemo(() => buildMetricViews(personalSessions, WELLBEING), [personalSessions]);
+  const vitals = useMemo(() => buildMetricViews(personalSessions, VITALS), [personalSessions]);
+  const symptoms = useMemo(() => buildMetricViews(personalSessions, SYMPTOMS), [personalSessions]);
+  const hema = useMemo(() => buildMetricViews(personalSessions, HEMA), [personalSessions]);
+  const metabolic = useMemo(() => buildMetricViews(referenceSessions, CMP_OSDR), [referenceSessions]);
+  const allKey = useMemo(() => [...wellbeing, ...vitals, ...hema], [wellbeing, vitals, hema]);
   const summary = useMemo(() => overallSummary(allKey), [allKey]);
   const allMetrics = useMemo(() => [...wellbeing, ...vitals, ...symptoms, ...hema, ...metabolic], [wellbeing, vitals, symptoms, hema, metabolic]);
 
@@ -303,7 +315,7 @@ export default function EstadoGeneralScreen() {
         subjectId,
       );
       await load();
-      setSeedingStatus(`Datos cargados: ${res.sessionsCreated} momentos de misión (${res.observationsCreated} analitos) de ${selectedCrew} sincronizados.`);
+      setSeedingStatus(`Datos de referencia cargados localmente: ${res.sessionsCreated} momentos de misión (${res.observationsCreated} analitos) de ${selectedCrew}. Este dataset NASA no se sincroniza con tu cuenta.`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setSeedingStatus(`Error al cargar datos: ${msg}`);
@@ -312,6 +324,7 @@ export default function EstadoGeneralScreen() {
     }
   }, [services, selectedCrew, load]);
   const selected = useMemo(() => allMetrics.find((m) => m.metricId === selectedMetricId) ?? null, [allMetrics, selectedMetricId]);
+  const selectedIsReference = selected !== null && CMP_OSDR.includes(selected.metricId);
   const selectedTrend = useMemo(() => (selected ? assessTrend(selected) : null), [selected]);
 
   const scheduleReminder = useCallback(async () => {
@@ -359,7 +372,7 @@ export default function EstadoGeneralScreen() {
           <Text style={styles.heroTitle}>Estado general de salud</Text>
           <View style={styles.row}>
             <StatusBadge label={summary.label} tone={summary.tone} />
-            <Text style={styles.body}>{sessions.length} sesión(es) analizadas</Text>
+            <Text style={styles.body}>{personalSessions.length} sesión(es) tuyas analizadas</Text>
           </View>
           <Text style={styles.body}>{summary.detail}</Text>
           <Text style={styles.disclaimer}>Informativo, no diagnóstico. Toca una métrica para ver su gráfica completa, tendencia (mejora/empeoramiento) y alertas.</Text>
@@ -401,7 +414,10 @@ export default function EstadoGeneralScreen() {
         <Text style={styles.sectionHint}>Estudio SpaceX Inspiration4: 11 biomarcadores séricos en 7 momentos de misión (L-92 a R+194).</Text>
         <Card title="Explorador de Datos Espaciales Inspiration4">
           <Text style={styles.body}>
-            Respuesta fisiológica de los 4 astronautas civiles ante la microgravedad orbital (LSDS-8 y EvePanel). Carga la serie temporal de un tripulante en tu perfil.
+            Respuesta fisiológica de los 4 astronautas civiles ante la microgravedad orbital (LSDS-8 y EvePanel). Carga la serie temporal de un tripulante para explorarla en la app.
+          </Text>
+          <Text style={styles.sectionHint}>
+            Datos de referencia externos de NASA OSDR: se guardan solo en este dispositivo y se marcan como referencia. No son tus mediciones ni se suben a tu cuenta.
           </Text>
           <View style={styles.crewSelectorRow}>
             {(['C001', 'C002', 'C003', 'C004'] as const).map((c) => (
@@ -467,6 +483,12 @@ export default function EstadoGeneralScreen() {
             {selected && selectedTrend ? (
               <>
                 <Text style={styles.modalTitle}>{selected.name}</Text>
+                {selectedIsReference ? (
+                  <View style={styles.refBox}>
+                    <Text style={styles.refTitle}>Datos de referencia externos</Text>
+                    <Text style={styles.alertText}>NASA OSDR OSD-575 (astronautas SpaceX Inspiration4). No son tus mediciones; tendencia y rangos son solo informativos.</Text>
+                  </View>
+                ) : null}
                 <View style={styles.row}>
                   <View style={[styles.statusPill, { borderColor: statusColor(selected.status.status), backgroundColor: `${statusColor(selected.status.status)}14` }]}>
                     <Text style={[styles.statusPillText, { color: statusColor(selected.status.status) }]}>{statusLabelEs(selected.status.status)}</Text>
@@ -568,7 +590,9 @@ const styles = StyleSheet.create({
   modalTitle: { ...typography.title, color: palette.textPrimary },
   alertBox: { borderWidth: 1, borderColor: palette.priority, backgroundColor: `${palette.priority}14`, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs },
   okBox: { borderWidth: 1, borderColor: palette.success, backgroundColor: `${palette.success}14`, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs },
+  refBox: { borderWidth: 1, borderColor: palette.accent, backgroundColor: `${palette.accent}14`, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs },
   alertTitle: { ...typography.cardTitle, color: palette.textPrimary },
+  refTitle: { ...typography.cardTitle, color: palette.textPrimary },
   okTitle: { ...typography.cardTitle, color: palette.textPrimary },
   alertText: { ...typography.body, color: palette.textSecondary },
   chartTitle: { ...typography.secondary, color: palette.textPrimary, fontWeight: '700', marginBottom: spacing.xs },

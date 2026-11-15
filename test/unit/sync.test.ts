@@ -140,6 +140,39 @@ describe('SyncNowUseCase', () => {
     expect(result.kind).toBe('remote_error');
   });
 
+  it('retira filas de datasets externos (NASA OSDR) sin subirlas a la cuenta', async () => {
+    const store = new InMemoryOutbox();
+    store.rows.push(
+      // Encolada antes del arreglo con fuente externa en payload: se retira por source.
+      makeRow('ext-1', 'measurement_session', {
+        session_id: 'ext-1',
+        source: 'nasa_osdr_osd575',
+      }),
+      // Encolada sin source en payload, pero el id determina que es NASA: se retira por prefijo.
+      makeRow('osd575-c001-plus1:glucose', 'observation', {
+        observation_id: 'osd575-c001-plus1:glucose',
+        session_id: 'osd575-c001-plus1',
+        metric_id: 'glucose',
+      }),
+      makeRow('s1', 'measurement_session', { session_id: 's1' }),
+    );
+    const { supabase, upserts } = makeFakeSupabase({ hasSession: true });
+    const useCase = new SyncNowUseCase(supabase as never, store);
+    const result = await useCase.execute();
+    expect(result.kind).toBe('synced');
+    if (result.kind === 'synced') {
+      expect(result.pushed).toBe(1); // solo la fila personal s1
+    }
+    expect(upserts).toHaveLength(1);
+    expect(upserts[0].payloads[0].client_request_id).toBe('s1');
+    expect(store.rows).toHaveLength(0);
+    expect(store.doneIds).toContain('measurement_session:ext-1');
+    expect(store.doneIds).toContain('observation:osd575-c001-plus1:glucose');
+    // Nunca se subieron ni se marcaron como historial personal sincronizado.
+    expect(store.syncedEntities).toHaveLength(1);
+    expect(store.syncedEntities[0].id).toBe('s1');
+  });
+
   it('normaliza códigos legacy de métrica en el payload antes de enviar (symptom_nauseas -> symptom_nausea)', async () => {
     const store = new InMemoryOutbox();
     store.rows.push(

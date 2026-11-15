@@ -27,6 +27,17 @@ export type SyncState = (typeof SYNC_STATES)[number];
 export const QUALITY_STATES = ['ok', 'suspect', 'invalid'] as const;
 export type QualityState = (typeof QUALITY_STATES)[number];
 
+/**
+ * Fuentes de datos externos de referencia (p. ej. NASA OSDR OSD-575).
+ * Se guardan localmente para exploración, pero NO representan mediciones
+ * de la persona usuaria: nunca se suben a su cuenta remota.
+ */
+export const EXTERNAL_REFERENCE_SOURCES = ['nasa_osdr_osd575'] as const;
+
+export function isExternalReferenceSource(source: string): boolean {
+  return (EXTERNAL_REFERENCE_SOURCES as readonly string[]).includes(source);
+}
+
 export interface Observation {
   observationId: string;
   sessionId: string;

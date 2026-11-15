@@ -17,10 +17,16 @@ export interface SessionWithObservations {
  * solo habla con esta interfaz a través de casos de uso.
  */
 export interface ObservationRepository {
-  /** Guarda sesión + observaciones en una sola transacción. */
+  /**
+   * Guarda sesión + observaciones en una sola transacción.
+   *
+   * `syncable: false` guarda datos de referencia externa (p. ej. un
+   * dataset NASA) sin encolarlos para subirlos como historial personal.
+   */
   saveSessionWithObservations(
     session: MeasurementSession,
     observations: readonly NewObservationInput[],
+    options?: { syncable?: boolean },
   ): Promise<void>;
 
   /** Sesiones recientes con observaciones, más antigua al final. */

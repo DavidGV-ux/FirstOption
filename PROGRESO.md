@@ -21,6 +21,7 @@
 ### Modelo de datos
 - **Remoto (Supabase):** `supabase/proposed-migrations/000_supabase_model_v2.sql` (v2.0.0): perfiles, misiones, acceso clínico, identidad local vinculada, catálogo de métricas, conversiones, sesiones, observaciones (con `client_request_id`), adjuntos, laboratorio, basales, análisis, protocolos, revisión, sync_outbox, auditoría, RLS completa.
 - **Local (SQLite):** migraciones v1–v8: esquema inicial + catálogo, outbox/cursores, laboratorio/basales, analysis_runs, identidad local/auth/auditoría, columnas `remote_user_id`/`client_request_id`, corrección de código legacy de náusea, **inspección asistida por cámara** (sesiones, capturas, métricas de calidad, estimaciones pupilares, comparaciones) y **catálogo metabólico OSD-575**.
+- **OSD-575 (NASA OSDR):** el dataset de referencia SpaceX Inspiration4 (11 analitos séricos, 4 tripulantes × 7 momentos) se guarda **solo en este dispositivo** con fuente `nasa_osdr_osd575`. **Nunca** se encola en `sync_outbox` ni se sube a la cuenta remota: no son mediciones de la persona usuaria. Si ya quedaron filas pendientes de versiones anteriores, el push las retira sin subirlas. Inicio/Historial/"Estado general"/análisis/conteos de pendientes **excluyen** estas filas del resumen personal.
 
 ## Archivos relevantes
 
@@ -57,7 +58,7 @@
 - `supabase/proposed-migrations/README.md` — instrucciones de aplicación.
 
 ### Pruebas
-- `test/unit/` — 107 pruebas (dominio, aplicación, autenticación offline, sincronización push/pull, importación remota, identidad con respaldo offline, analítica, OSD-575, inspección por cámara, selección de lente y límites de PPG).
+- `test/unit/` — 109 pruebas (dominio, aplicación, autenticación offline, sincronización push/pull, importación remota, identidad con respaldo offline, analítica, OSD-575, inspección por cámara, selección de lente y límites de PPG).
 - `test/integration/sqlite.test.ts` — 10 pruebas sobre SQLite real (incluye migraciones v6, v7 y v8, e integridad de tablas de cámara).
 
 ### Documentación
@@ -91,7 +92,7 @@
 ## Comandos verificados (última actualización local)
 ```
 npx tsc --noEmit          # OK
-npx jest                  # 107 pruebas unitarias: OK
+npx jest                  # 109 pruebas unitarias: OK
 npm run test:integration  # 10 pruebas de integración: OK
 npx expo lint             # sin problemas
 ```

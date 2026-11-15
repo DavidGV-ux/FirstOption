@@ -5,6 +5,10 @@ import type {
   QualityState,
   SyncState,
 } from '@/domain/observations/observation';
+import {
+  EXTERNAL_REFERENCE_SOURCES,
+  isExternalReferenceSource,
+} from '@/domain/observations/observation';
 import type {
   NewObservationInput,
   ObservationRepository,
@@ -125,7 +129,13 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
   async saveSessionWithObservations(
     session: MeasurementSession,
     observations: readonly NewObservationInput[],
+    options?: { syncable?: boolean },
   ): Promise<void> {
+    // Los datasets externos (NASA OSDR) son material de referencia:
+    // se guardan localmente para exploración, pero no se encolan como
+    // historial personal ni se suben a la cuenta remota.
+    const syncable =
+      options?.syncable !== false && !isExternalReferenceSource(session.source);
     await this.driver.withTransaction(async () => {
       await this.driver.run(
         `INSERT INTO measurement_sessions
@@ -173,37 +183,43 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
           ],
         );
         // Entrada de outbox (misma transacción, idempotente por entidad).
-        await this.enqueueOutbox(
-          'observation',
-          this.observationId(session.sessionId, obs),
-          {
-            observation_id: this.observationId(session.sessionId, obs),
-            session_id: session.sessionId,
-            metric_id: obs.metricId,
-            value_original: obs.valueOriginal,
-            unit_original: obs.unitOriginal,
-            observed_at: obs.observedAt,
-            local_date: obs.localDate,
-            quality_state: obs.qualityState ?? 'ok',
-            created_at: createdAt,
-            client_request_id: this.observationId(session.sessionId, obs),
-          },
-          createdAt,
-        );
+        if (syncable) {
+          await this.enqueueOutbox(
+            'observation',
+            this.observationId(session.sessionId, obs),
+            {
+              observation_id: this.observationId(session.sessionId, obs),
+              session_id: session.sessionId,
+              metric_id: obs.metricId,
+              value_original: obs.valueOriginal,
+              unit_original: obs.unitOriginal,
+              observed_at: obs.observedAt,
+              local_date: obs.localDate,
+              quality_state: obs.qualityState ?? 'ok',
+              source: session.source,
+              mission_phase: session.missionPhase,
+              created_at: createdAt,
+              client_request_id: this.observationId(session.sessionId, obs),
+            },
+            createdAt,
+          );
+        }
       }
 
       // Encolar también la sesión.
-      await this.enqueueOutbox('measurement_session', session.sessionId, {
-        session_id: session.sessionId,
-        subject_id: session.subjectId,
-        mission_phase: session.missionPhase,
-        recorded_at: session.recordedAt,
-        recorded_local_date: session.recordedLocalDate,
-        source: session.source,
-        note: session.note,
-        created_at: session.createdAt,
-        client_request_id: session.sessionId,
-      }, createdAt);
+      if (syncable) {
+        await this.enqueueOutbox('measurement_session', session.sessionId, {
+          session_id: session.sessionId,
+          subject_id: session.subjectId,
+          mission_phase: session.missionPhase,
+          recorded_at: session.recordedAt,
+          recorded_local_date: session.recordedLocalDate,
+          source: session.source,
+          note: session.note,
+          created_at: session.createdAt,
+          client_request_id: session.sessionId,
+        }, createdAt);
+      }
     });
   }
 
@@ -273,39 +289,51 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
   }
 
   async countPendingSync(subjectId?: string): Promise<{ sessions: number; observations: number }> {
+    // Los datasets externos de referencia (NASA OSDR) nunca se envían:
+    // no deben aparecer como historial pendiente de sincronizar.
+    const externalSources = EXTERNAL_REFERENCE_SOURCES as readonly string[];
+    const externalPlaceholders = externalSources.map(() => '?').join(', ');
     const sessionSql = subjectId === undefined
       ? `SELECT COUNT(*) AS n FROM measurement_sessions
-         WHERE sync_state IN ('local_only', 'pending_sync', 'sync_failed')`
+         WHERE sync_state IN ('local_only', 'pending_sync', 'sync_failed')
+           AND source NOT IN (${externalPlaceholders})`
       : `SELECT COUNT(*) AS n FROM measurement_sessions
-         WHERE subject_id = ? AND sync_state IN ('local_only', 'pending_sync', 'sync_failed')`;
+         WHERE subject_id = ? AND sync_state IN ('local_only', 'pending_sync', 'sync_failed')
+           AND source NOT IN (${externalPlaceholders})`;
     const obsSql = subjectId === undefined
       ? `SELECT COUNT(*) AS n FROM observations o
          JOIN measurement_sessions s ON s.session_id = o.session_id
-         WHERE o.sync_state IN ('local_only', 'pending_sync', 'sync_failed')`
+         WHERE o.sync_state IN ('local_only', 'pending_sync', 'sync_failed')
+           AND s.source NOT IN (${externalPlaceholders})`
       : `SELECT COUNT(*) AS n FROM observations o
          JOIN measurement_sessions s ON s.session_id = o.session_id
-         WHERE s.subject_id = ? AND o.sync_state IN ('local_only', 'pending_sync', 'sync_failed')`;
-    const sessions = await this.driver.getFirst<{ n: number }>(
-      sessionSql,
-      subjectId === undefined ? [] : [subjectId],
-    );
-    const observations = await this.driver.getFirst<{ n: number }>(
-      obsSql,
-      subjectId === undefined ? [] : [subjectId],
-    );
+         WHERE s.subject_id = ? AND o.sync_state IN ('local_only', 'pending_sync', 'sync_failed')
+           AND s.source NOT IN (${externalPlaceholders})`;
+    const sessionParams = subjectId === undefined ? [...externalSources] : [subjectId, ...externalSources];
+    const obsParams = sessionParams;
+    const sessions = await this.driver.getFirst<{ n: number }>(sessionSql, sessionParams);
+    const observations = await this.driver.getFirst<{ n: number }>(obsSql, obsParams);
     return { sessions: sessions?.n ?? 0, observations: observations?.n ?? 0 };
   }
 
   async adoptSubjectScope(fromSubjectId: string, toSubjectId: string): Promise<number> {
     if (fromSubjectId === toSubjectId) return 0;
-    let adopted = 0;
-    // Adoptar sesiones (y sus observaciones siguen enlazadas por session_id).
+    // Cuenta solo los registros personales; los datasets externos de
+    // referencia (NASA OSDR) también se trasladan de alcance para que la
+    // persona siga viéndolos, pero no se cuentan como sus registros.
+    const externalSources = EXTERNAL_REFERENCE_SOURCES as readonly string[];
+    const placeholders = externalSources.map(() => '?').join(', ');
+    const personalCount = await this.driver.getFirst<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM measurement_sessions
+       WHERE subject_id = ? AND source NOT IN (${placeholders})`,
+      [fromSubjectId, ...externalSources],
+    );
+    const adopted = personalCount?.n ?? 0;
     await this.driver.withTransaction(async () => {
-      const sessions = await this.driver.run(
+      await this.driver.run(
         `UPDATE measurement_sessions SET subject_id = ? WHERE subject_id = ?`,
         [toSubjectId, fromSubjectId],
       );
-      adopted = sessions.changes;
       // Laboratorio (si existe la tabla).
       try {
         await this.driver.run(
@@ -336,9 +364,12 @@ export class SqliteObservationRepository implements ObservationRepository, SyncO
   }
 
   async countRecordsBySubject(subjectId: string): Promise<number> {
+    const externalSources = EXTERNAL_REFERENCE_SOURCES as readonly string[];
+    const placeholders = externalSources.map(() => '?').join(', ');
     const row = await this.driver.getFirst<{ n: number }>(
-      `SELECT COUNT(*) AS n FROM measurement_sessions WHERE subject_id = ?`,
-      [subjectId],
+      `SELECT COUNT(*) AS n FROM measurement_sessions
+       WHERE subject_id = ? AND source NOT IN (${placeholders})`,
+      [subjectId, ...externalSources],
     );
     return row?.n ?? 0;
   }

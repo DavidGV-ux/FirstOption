@@ -29,6 +29,7 @@ Prototipo móvil de seguimiento longitudinal (contextos análogos, bienestar y r
 | Ejecuciones de análisis reproducibles (`analysis_runs` + observaciones de entrada) | ✅ Implementado |
 | Reflejo fotomotor pupilar (PLR) experimental | 🚧 Experimental (`/linterna`): pulso de luz y cinemática; solo muestra valores si hay muestras reales, **no** clasifica fatiga ni diagnostica |
 | Pulso óptico con linterna (PPG) | 🚧 Experimental (`/linterna`): solo frecuencia cardíaca y calidad de señal; presión y SpO₂ no se miden ni se guardan |
+| Explorador NASA OSDR OSD-575 (SpaceX Inspiration4) | ✅ Implementado (`/estado`): 11 analitos séricos de referencia para 4 tripulantes × 7 momentos; se guarda **solo localmente**, nunca se sube a tu cuenta |
 | Pronóstico de referencia y proyección experimental con intervalo de predicción real | ⏳ Pendiente (Incremento 5) |
 | Protocolos versionados, eventos de revisión y exportación | ⏳ Pendiente (Incremento 6) |
 | Voz y pupila automatizadas validadas | ⏳ Fuera de alcance por ahora: sin modelos/feature flags validados; la app no simula mediciones ni conclusiones clínicas |
@@ -55,9 +56,9 @@ Detalle del avance en [`PROGRESO.md`](PROGRESO.md).
 - React Hook Form + Zod.
 - Sistema de diseño responsivo (1 columna en móvil, 2 en tablet) con
   tokens de color verificados y foco en accesibilidad.
-- Pruebas: Jest (107 unitarias: dominio, aplicación, sincronización,
+- Pruebas: Jest (109 unitarias: dominio, aplicación, sincronización,
   pull/importación remota, identidad con respaldo offline, autenticación,
-  analítica, inspección por cámara) + SQLite real con `node:sqlite`
+  analítica, inspección por cámara, OSD-575) + SQLite real con `node:sqlite`
   (10 de integración: migraciones, persistencia, integridad, outbox,
   cámara).
 
@@ -154,7 +155,7 @@ datos siguen guardados en el dispositivo. Instrucciones en
 ```bash
 npm install
 npx tsc --noEmit          # verificación de tipos: OK
-npx jest                  # 107 pruebas unitarias: OK
+npx jest                  # 109 pruebas unitarias: OK
 npm run test:integration  # 10 pruebas de integración con SQLite real: OK
 npx expo lint             # sin problemas
 npx expo-doctor           # 20/20 comprobaciones OK (última ejecución registrada)

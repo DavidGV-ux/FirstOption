@@ -37,6 +37,13 @@
 - **Cursor incremental de descarga**: pendiente (Inc 2 continúa); el
   pull actual pagina el historial completo y es idempotente, así que
   repetirlo no duplica datos.
+- **Datasets externos de referencia (NASA OSDR OSD-575):**
+  no son historial personal. Se guardan localmente con fuente
+  `nasa_osdr_osd575`, **nunca se encolan** en `sync_outbox` y no cuentan
+  como pendientes de sincronizar ni como registros personales (Inicio,
+  Historial, "Estado general" y análisis los excluyen en pantalla).
+  Las filas de versiones anteriores que hubieran quedado en la cola
+  se retiran al sincronizar sin subirse al servidor.
 
 ## Política de identidad y RLS
 

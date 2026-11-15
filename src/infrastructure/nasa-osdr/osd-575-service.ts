@@ -84,7 +84,10 @@ export class Osd575Service {
       });
 
       try {
-        await repo.saveSessionWithObservations(session, observations);
+        // `syncable: false`: el dataset NASA es material de referencia
+        // externo. Se guarda localmente para exploración, pero no se
+        // encola ni se sube como historial personal de la cuenta.
+        await repo.saveSessionWithObservations(session, observations, { syncable: false });
         sessionsCount++;
         observationsCount += observations.length;
       } catch (err: unknown) {

@@ -1,8 +1,9 @@
-import type {
-  MeasurementSession,
-  MissionPhase,
-  Observation,
-  SyncState,
+import {
+  isExternalReferenceSource,
+  type MeasurementSession,
+  type MissionPhase,
+  type Observation,
+  type SyncState,
 } from '@/domain/observations/observation';
 import type {
   ObservationRepository,
@@ -39,16 +40,18 @@ export class ListRecentActivityUseCase {
 
   async latestLogStatus(): Promise<LatestLogStatus> {
     const subjectId = await this.identity.getOrCreateSubjectId();
+    // Fichas externas de referencia (NASA OSDR) no cuentan como tu último registro.
     const [sessions, definitions] = await Promise.all([
-      this.repository.listRecentSessions(1, subjectId),
+      this.repository.listRecentSessions(20, subjectId),
       this.repository.listMetricDefinitions(),
     ]);
-    if (sessions.length === 0) {
+    const personal = sessions.filter((s) => !isExternalReferenceSource(s.session.source));
+    if (personal.length === 0) {
       return { entry: null, isToday: false };
     }
-    const entry = toEntry(sessions[0], this.clock.nowIso(), definitions);
+    const entry = toEntry(personal[0], this.clock.nowIso(), definitions);
     const today = localDateToday(this.clock.nowIso());
-    return { entry, isToday: sessions[0].session.recordedLocalDate === today };
+    return { entry, isToday: personal[0].session.recordedLocalDate === today };
   }
 
   async listRecent(limit: number): Promise<RecentLogEntry[]> {
@@ -57,7 +60,9 @@ export class ListRecentActivityUseCase {
       this.repository.listRecentSessions(limit, subjectId),
       this.repository.listMetricDefinitions(),
     ]);
-    return sessions.map((s) => toEntry(s, this.clock.nowIso(), definitions));
+    return sessions
+      .filter((s) => !isExternalReferenceSource(s.session.source))
+      .map((s) => toEntry(s, this.clock.nowIso(), definitions));
   }
 
   async listRecentSessions(limit: number): Promise<SessionWithObservations[]> {

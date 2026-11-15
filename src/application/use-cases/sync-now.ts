@@ -3,6 +3,7 @@ import type {
   OutboxRow,
   SyncOutboxStore,
 } from '@/domain/repositories/sync-outbox';
+import { isExternalReferenceSource } from '@/domain/observations/observation';
 
 export type SyncStatus =
   | { kind: 'synced'; pushed: number; remaining: number }
@@ -69,6 +70,12 @@ export class SyncNowUseCase {
     let failures = 0;
     let lastError: string | null = null;
     for (const row of pending) {
+      // Datos externos de referencia (NASA OSDR) encolados antes de la
+      // corrección: se retiran sin subirlos a la cuenta de la persona.
+      if (this.isExternalReferenceRow(row)) {
+        await this.store.markOutboxDone(row.outbox_id);
+        continue;
+      }
       try {
         await this.pushOne(row, userId);
         await this.store.markOutboxDone(row.outbox_id);
@@ -98,6 +105,24 @@ export class SyncNowUseCase {
       };
     }
     return { kind: 'synced', pushed, remaining };
+  }
+
+  /**
+   * Detecta filas de datasets externos de referencia (NASA OSDR) que
+   * pudieran haber quedado en la cola antes de marcarlas como no
+   * sincronizables. Nunca se suben: no son historial personal.
+   */
+  private isExternalReferenceRow(row: OutboxRow): boolean {
+    if (row.entity_id.startsWith('osd575-')) return true;
+    try {
+      const raw = JSON.parse(row.payload) as Record<string, unknown>;
+      const source = typeof raw.source === 'string' ? raw.source : null;
+      if (source !== null && isExternalReferenceSource(source)) return true;
+      const sessionId = typeof raw.session_id === 'string' ? raw.session_id : '';
+      return sessionId.startsWith('osd575-');
+    } catch {
+      return false;
+    }
   }
 
   private async pushOne(row: OutboxRow, userId: string): Promise<void> {

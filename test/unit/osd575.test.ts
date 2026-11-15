@@ -56,11 +56,13 @@ describe('NASA OSDR OSD-575 Dataset and Service', () => {
   it('siembra sesiones y observaciones en el repositorio con IDs deterministas e idempotencia', async () => {
     const savedSessions: MeasurementSession[] = [];
     const savedObs: unknown[][] = [];
+    const savedOptions: ({ syncable?: boolean } | undefined)[] = [];
 
     const mockRepo: ObservationRepository = {
-      async saveSessionWithObservations(session, observations) {
+      async saveSessionWithObservations(session, observations, options) {
         savedSessions.push(session);
         savedObs.push([...observations]);
+        savedOptions.push(options);
       },
       async listRecentSessions() {
         return [];
@@ -91,6 +93,10 @@ describe('NASA OSDR OSD-575 Dataset and Service', () => {
     expect(savedSessions[0].sessionId).toMatch(/^osd575-c002-/);
 
     expect(savedObs[0]).toHaveLength(11);
+    // El dataset NASA OSDR es referencia externa: nunca se encola ni se
+    // sube como historial personal.
+    expect(savedOptions).toHaveLength(7);
+    expect(savedOptions.every((o) => o?.syncable === false)).toBe(true);
   });
 
   it('evalúa rangos clínicos e informativos para las nuevas métricas metabólicas', () => {
