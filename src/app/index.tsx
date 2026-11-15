@@ -199,10 +199,12 @@ export default function HomeScreen() {
 
         <View style={styles.welcome}>
           <Text style={styles.eyebrow}>Tu espacio de bienestar</Text>
-          <Text style={styles.welcomeTitle}>
+          <Text style={styles.welcomeTitle} numberOfLines={2} ellipsizeMode="tail">
             Hola{displayName ? `, ${displayName}` : accountScope?.email ? `, ${accountScope.email.split('@')[0]}` : ''}.
           </Text>
-          <Text style={styles.welcomeText}>Haz seguimiento de tu bienestar, registra tus mediciones y consulta tu evolución en un solo lugar.</Text>
+          <Text style={styles.welcomeText} numberOfLines={3} ellipsizeMode="tail">
+            Haz seguimiento de tu bienestar, registra tus mediciones y consulta tu evolución en un solo lugar.
+          </Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Registrar seguimiento"
@@ -240,11 +242,11 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.activity}>
+        <View style={[styles.activity, { overflow: 'hidden' }]}>
           <View style={styles.activityIcon}><Text style={styles.activityIconText}>!</Text></View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.activityTitle}>Actividad reciente</Text>
-            <Text style={styles.activityText} numberOfLines={2} ellipsizeMode="tail">
+          <View style={{ flex: 1, minWidth: 0, width: '100%' }}>
+            <Text style={styles.activityTitle} numberOfLines={1} ellipsizeMode="tail">Actividad reciente</Text>
+            <Text style={[styles.activityText, { zIndex: 1 }]} numberOfLines={2} ellipsizeMode="tail">
               {entry
                 ? `${entry.summaryParts.length > 0 ? entry.summaryParts.join(' · ') : 'Sesión registrada'} · ${entry.syncState === 'local_only' ? 'solo en dispositivo' : entry.syncState}`
                 : 'Tu información está al día. Los registros nuevos aparecerán aquí.'}
@@ -355,12 +357,12 @@ const styles = StyleSheet.create({
   avatarText: { color: palette.textPrimary, fontSize: 13, fontWeight: '600' },
   statusRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', marginBottom: spacing.sm },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: palette.border, borderRadius: 30, paddingVertical: 7, paddingHorizontal: 11, backgroundColor: palette.surfaceAlt },
-  pillText: { fontSize: 11, color: palette.textSecondary },
+  pillText: { fontSize: 11, color: palette.textPrimary },
   dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: palette.success },
-  welcome: { flexDirection: 'column', gap: spacing.sm, marginBottom: spacing.xs },
-  eyebrow: { fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: palette.textSecondary, fontWeight: '600', marginBottom: spacing.xs },
+  welcome: { flexDirection: 'column', gap: spacing.sm, marginBottom: spacing.md },
+  eyebrow: { fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: palette.accent, fontWeight: '600', marginBottom: spacing.xs },
   welcomeTitle: { fontSize: 26, letterSpacing: -1, fontWeight: '700', color: palette.textPrimary },
-  welcomeText: { ...typography.body, color: palette.textSecondary, lineHeight: 1.7, marginBottom: spacing.sm },
+  welcomeText: { ...typography.body, color: palette.textPrimary, lineHeight: 1.7, marginBottom: spacing.sm },
   primaryCta: { borderRadius: 14, backgroundColor: palette.accent, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0, minHeight: 48 },
   primaryCtaText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.lg, marginBottom: spacing.sm },
@@ -368,32 +370,32 @@ const styles = StyleSheet.create({
   textButton: { color: '#62A6FF', fontSize: 12, fontWeight: '600', padding: spacing.xs },
   metricsGrid: { flexDirection: 'row', gap: 12, flexWrap: 'wrap', marginBottom: spacing.lg },
   metricCard: { flex: 1, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, padding: spacing.md, minHeight: 130, gap: spacing.xs },
-  metricLabel: { color: palette.textSecondary, fontSize: 11, lineHeight: 16 },
+  metricLabel: { color: palette.textPrimary, fontSize: 11, lineHeight: 16 },
   metricValue: { fontSize: 28, fontWeight: '700', letterSpacing: -1, color: palette.textPrimary, lineHeight: 1 },
   metricNote: { fontSize: 10, fontWeight: '600', lineHeight: 15 },
   activity: { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', marginBottom: spacing.lg },
   activityIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(255,181,71,0.12)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   activityIconText: { color: palette.attention, fontWeight: '700' },
   activityTitle: { fontSize: 14, fontWeight: '600', color: palette.textPrimary, marginBottom: spacing.xs },
-  activityText: { fontSize: 13, color: palette.textSecondary, lineHeight: 1.7, flex: 1, flexShrink: 1 },
+  activityText: { fontSize: 13, color: palette.textPrimary, lineHeight: 1.7, flex: 1, flexShrink: 1 },
   quickGrid: { flexDirection: 'row', gap: 12, flexWrap: 'wrap', marginBottom: spacing.lg },
   quick: { flex: 1, minWidth: '33%', backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, padding: spacing.md, minHeight: 128, justifyContent: 'space-between', gap: spacing.xs },
   quickPressed: { borderColor: 'rgba(10,132,255,0.6)', backgroundColor: palette.surfaceAlt },
   quickTitle: { fontSize: 14, fontWeight: '700', color: palette.textPrimary, marginBottom: spacing.xs },
-  quickDesc: { fontSize: 11, lineHeight: 16, color: palette.textSecondary },
+  quickDesc: { fontSize: 11, lineHeight: 16, color: palette.textPrimary },
   syncCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.xs },
   syncSymbol: { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(10,132,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   syncSymbolText: { color: '#58A6FF', fontWeight: '700', fontSize: 16 },
   syncInfo: { flex: 1 },
   syncTitle: { fontSize: 14, fontWeight: '600', color: palette.textPrimary },
-  syncText: { fontSize: 11, color: palette.textSecondary, marginTop: 2 },
+  syncText: { fontSize: 11, color: palette.textPrimary, marginTop: 2 },
   syncBtn: { borderRadius: 14, borderWidth: 1, borderColor: 'rgba(10,132,255,0.55)', backgroundColor: 'rgba(10,132,255,0.08)', color: '#69B0FF', paddingVertical: 11, paddingHorizontal: spacing.sm, fontWeight: '600', fontSize: 13 },
   syncBtnText: { fontSize: 13, fontWeight: '600', color: '#69B0FF' },
   syncMessage: { ...typography.small, color: palette.textSecondary },
   secondaryBtn: { minHeight: 44, borderRadius: 14, borderWidth: 1, borderColor: palette.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, alignSelf: 'flex-start' },
   secondaryBtnText: { ...typography.secondary, color: palette.accent, fontWeight: '700' },
-  bodyText: { ...typography.body, color: palette.textSecondary },
-  noteText: { ...typography.secondary, color: palette.textSecondary, fontStyle: 'italic' },
+  bodyText: { ...typography.body, color: palette.textPrimary },
+  noteText: { ...typography.secondary, color: palette.textPrimary, fontStyle: 'italic' },
   pressed: { opacity: 0.85 },
   errorBox: { backgroundColor: `${palette.priority}14`, borderRadius: radius.sm, borderWidth: 1, borderColor: palette.priority, padding: spacing.sm },
   errorText: { ...typography.secondary, color: palette.priority, fontWeight: '600' },
