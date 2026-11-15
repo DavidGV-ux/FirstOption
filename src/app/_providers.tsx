@@ -22,6 +22,7 @@ import { AnalyzeInspectionCaptureUseCase } from '@/application/use-cases/analyze
 import { SaveCameraInspectionUseCase } from '@/application/use-cases/save-camera-inspection';
 import { CompareInspectionCapturesUseCase } from '@/application/use-cases/compare-inspection-captures';
 import { EstimatePulseVitalsUseCase } from '@/application/use-cases/estimate-pulse-vitals';
+import { ExecutePlrTestUseCase } from '@/application/use-cases/execute-plr-test';
 import { SqliteInspectionRepository } from '@/infrastructure/repositories/sqlite-inspection-repository';
 import { ExpoImageEncoder } from '@/infrastructure/camera/image-encoder';
 import { ExpoFrameProcessor } from '@/infrastructure/camera/expo-frame-processor';
@@ -69,6 +70,7 @@ interface AppServices {
   saveCameraInspection: SaveCameraInspectionUseCase;
   compareInspectionCaptures: CompareInspectionCapturesUseCase;
   estimatePulseVitals: EstimatePulseVitalsUseCase;
+  executePlrTest: ExecutePlrTestUseCase;
   imageEncoder: ExpoImageEncoder;
   cameraCapture: ExpoCameraCapture;
   supabase: SupabaseClient | null;
@@ -173,7 +175,7 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
             saveCameraInspection: new SaveCameraInspectionUseCase(
               inspectionRepository,
               repository,
-              imageEncoder,
+            imageEncoder,
               clock,
               ids,
             ),
@@ -182,6 +184,12 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
               ids,
             ),
             estimatePulseVitals: new EstimatePulseVitalsUseCase(
+              repository,
+              identity,
+              clock,
+              ids,
+            ),
+            executePlrTest: new ExecutePlrTestUseCase(
               repository,
               identity,
               clock,

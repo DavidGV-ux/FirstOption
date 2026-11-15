@@ -34,6 +34,7 @@ import { useAppServices } from './_providers';
 import { InspectionDisclaimer } from '@/presentation/features/inspection/InspectionDisclaimer';
 import { CameraInspectionView } from '@/presentation/features/inspection/CameraInspectionView';
 import { CameraPulseView } from '@/presentation/features/inspection/CameraPulseView';
+import { CameraPlrView } from '@/presentation/features/inspection/CameraPlrView';
 import { QualityIndicator } from '@/presentation/features/inspection/QualityIndicator';
 import { RelativePupilCard } from '@/presentation/features/inspection/RelativePupilCard';
 import { InspectionHistoryCard } from '@/presentation/features/inspection/InspectionHistoryCard';
@@ -56,7 +57,7 @@ export default function LinternaScreen() {
   const [torchOn, setTorchOn] = useState(false);
 
   // Modo de inspección: pupilar, pulso/PPG con linterna, o linterna manual
-  const [inspectionMode, setInspectionMode] = useState<'pupil' | 'pulse' | 'manual'>('pupil');
+  const [inspectionMode, setInspectionMode] = useState<'pupil' | 'pulse' | 'plr' | 'manual'>('pupil');
 
   // Formulario y estado de inspección
   const [phase, setPhase] = useState<MissionPhase | null>(null);
@@ -266,7 +267,7 @@ export default function LinternaScreen() {
         {/* Aviso y disclaimer ético obligatorio permanente */}
         <InspectionDisclaimer />
 
-        {/* Selector de modo: Pupilar vs Pulso (PPG) */}
+        {/* Selector de modo de inspección */}
         <View style={[cardStyle, styles.modeSection]}>
           <Text style={styles.sectionTitle}>Modo de inspección asistida</Text>
           <View style={styles.row}>
@@ -290,7 +291,19 @@ export default function LinternaScreen() {
               style={[styles.option, inspectionMode === 'pulse' && styles.optionSelected]}
             >
               <Text style={[styles.optionLabel, inspectionMode === 'pulse' && styles.optionLabelSelected]}>
-                Pulso con linterna (PPG)
+                Pulso (PPG)
+              </Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Modo reflejo fotomotor pupilar (PLR)"
+              accessibilityState={{ selected: inspectionMode === 'plr' }}
+              onPress={() => setInspectionMode('plr')}
+              style={[styles.option, inspectionMode === 'plr' && styles.optionSelected]}
+            >
+              <Text style={[styles.optionLabel, inspectionMode === 'plr' && styles.optionLabelSelected]}>
+                Reflejo (PLR)
               </Text>
             </Pressable>
           </View>
@@ -374,7 +387,7 @@ export default function LinternaScreen() {
             ) : inspectionMode === 'pulse' ? (
               /* Modo medición de pulso con linterna (PPG) */
               <View style={[cardStyle, styles.section]}>
-                <Text style={styles.sectionTitle}>Medición de pulso con linterna (PPG)</Text>
+                <Text style={styles.sectionTitle}>Pulso con linterna (PPG)</Text>
                 <Text style={styles.hintText}>
                   Coloca la yema del dedo cubriendo suavemente la cámara trasera y la linterna para
                   medir las pulsaciones y estimar los signos vitales.
@@ -382,6 +395,22 @@ export default function LinternaScreen() {
 
                 {focused && (
                   <CameraPulseView
+                    missionPhase={phase}
+                    onSaved={() => void loadRecentHistory()}
+                  />
+                )}
+              </View>
+            ) : inspectionMode === 'plr' ? (
+              /* Modo reflejo fotomotor pupilar (PLR) */
+              <View style={[cardStyle, styles.section]}>
+                <Text style={styles.sectionTitle}>Reflejo Fotomotor Pupilar (PLR)</Text>
+                <Text style={styles.hintText}>
+                  Protocolo de estimulación con pulso de luz (300 ms) para medir latencia de contracción,
+                  velocidad de miosis y redilatación funcional.
+                </Text>
+
+                {focused && (
+                  <CameraPlrView
                     missionPhase={phase}
                     onSaved={() => void loadRecentHistory()}
                   />
