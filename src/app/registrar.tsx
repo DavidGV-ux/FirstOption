@@ -628,7 +628,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: palette.accent,
-    backgroundColor: 'rgba(53, 109, 120, 0.08)',
+    backgroundColor: palette.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,

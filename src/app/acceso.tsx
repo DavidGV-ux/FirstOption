@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     color: palette.textPrimary,
   },
   infoBox: {
-    backgroundColor: 'rgba(53,109,120,0.10)',
+    backgroundColor: `${palette.accent}14`,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: palette.accent,

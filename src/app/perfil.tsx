@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
     color: palette.textPrimary,
   },
   infoBox: {
-    backgroundColor: 'rgba(53,109,120,0.10)',
+    backgroundColor: `${palette.accent}14`,
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: palette.accent,
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
   },
   logoutText: { ...typography.secondary, color: palette.priority, fontWeight: '600' },
   codeDev: {
-    backgroundColor: 'rgba(240,184,75,0.12)',
+    backgroundColor: `${palette.attention}14`,
     borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: palette.attention,
