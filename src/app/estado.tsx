@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
   statusPill: { borderWidth: 1, borderRadius: 30, paddingHorizontal: spacing.sm, paddingVertical: 5 },
   statusPillText: { ...typography.small, fontWeight: '600' },
   metricRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
-  metricValue: { fontSize: 30, fontWeight: '700', letterSpacing: -1, color: palette.textPrimary, lineHeight: 1.1 },
+  metricValue: { fontSize: 30, fontWeight: '700', letterSpacing: -1, color: palette.textPrimary, lineHeight: 38 },
   metricSub: { ...typography.small, color: palette.textSecondary },
   metricDetail: { ...typography.small, color: palette.textSecondary },
   tapHint: { ...typography.small, color: palette.accent, fontWeight: '600' },
