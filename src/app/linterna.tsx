@@ -436,9 +436,16 @@ export default function LinternaScreen() {
               </View>
             )}
 
-            {/* SECCIÓN 4: DOCUMENTACIÓN DE LA INSPECCIÓN */}
-            <View style={[cardStyle, styles.section]}>
-              <Text style={styles.sectionTitle}>Documentación clínica y contexto</Text>
+            {/* SECCIÓN 4: DOCUMENTACIÓN DE LA INSPECCIÓN (solo modo pupila) */}
+            {inspectionMode === 'pupil' ? (
+              <View style={[cardStyle, styles.section]}>
+                <Text style={styles.sectionTitle}>Documentación clínica y contexto</Text>
+                <Text style={styles.hintText}>
+                  Esta sección registra el contexto de tu inspección pupilar: qué ojo
+                  evaluaste, la iluminación, la distancia, la fase de la misión y si
+                  notaste alguna alteración visual. Sirve como referencia para ti y para
+                  un profesional de salud; no constituye un diagnóstico.
+                </Text>
 
               {/* Ojo evaluado */}
               <Text style={styles.label}>Ojo evaluado</Text>
@@ -636,6 +643,7 @@ export default function LinternaScreen() {
                 cámara no sustituye tu descripción manual ni constituye un diagnóstico.
               </Text>
             </View>
+            ) : null}
           </>
         )}
       </ScrollView>
