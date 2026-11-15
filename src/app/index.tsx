@@ -143,6 +143,7 @@ export default function HomeScreen() {
     { title: 'Estado general', desc: 'Resumen de bienestar', route: '/estado' as const },
     { title: 'Historial', desc: 'Registros guardados', route: '/historial' as const },
     { title: 'Análisis', desc: 'Tendencias y estadísticas', route: '/analisis' as const },
+    { title: 'Linterna', desc: 'Inspección pupilar y pulso con linterna', route: '/linterna' as const },
   ];
 
   return (
