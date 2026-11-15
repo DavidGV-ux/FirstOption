@@ -63,7 +63,7 @@ export default function LinternaScreen() {
   // liberarse puede bloquear CameraX. Desmontamos, cambiamos de modo y
   // volvemos a montar tras una pausa breve.
   const [cameraMounted, setCameraMounted] = useState(true);
-  const [switchingMode, setSwitchingMode] = useState<'pupil' | 'pulse' | null>(null);
+  const [switchingMode, setSwitchingMode] = useState<'pupil' | 'pulse' | 'plr' | null>(null);
   const [cameraGeneration, setCameraGeneration] = useState(0);
   const switchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -123,7 +123,7 @@ export default function LinternaScreen() {
   // Cambio de modo con desmontaje previo de la cámara (evita bloqueos de
   // CameraX en Android al alternar pupila <-> pulso).
   const switchInspectionMode = useCallback(
-    (next: 'pupil' | 'pulse') => {
+    (next: 'pupil' | 'pulse' | 'plr') => {
       if (next === inspectionMode || switchingMode !== null) return;
       setTorchOn(false);
       setCameraMounted(false);
@@ -338,7 +338,8 @@ export default function LinternaScreen() {
               accessibilityRole="button"
               accessibilityLabel="Modo reflejo fotomotor pupilar (PLR)"
               accessibilityState={{ selected: inspectionMode === 'plr' }}
-              onPress={() => setInspectionMode('plr')}
+              onPress={() => switchInspectionMode('plr')}
+              disabled={switchingMode !== null}
               style={[styles.option, inspectionMode === 'plr' && styles.optionSelected]}
             >
               <Text style={[styles.optionLabel, inspectionMode === 'plr' && styles.optionLabelSelected]}>
@@ -455,8 +456,9 @@ export default function LinternaScreen() {
                   velocidad de miosis y redilatación funcional.
                 </Text>
 
-                {focused && (
+                {focused && cameraMounted && (
                   <CameraPlrView
+                    key={`plr-${cameraGeneration}`}
                     missionPhase={phase}
                     onSaved={() => void loadRecentHistory()}
                   />

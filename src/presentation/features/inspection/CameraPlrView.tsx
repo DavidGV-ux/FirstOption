@@ -13,6 +13,8 @@ import type { MissionPhase } from '@/domain/observations/observation';
 import { PlrProcessor, type PlrPhase } from '@/infrastructure/camera/plr-processor';
 import { useAppServices } from '@/app/_providers';
 import { cardStyle, palette, radius, spacing, typography } from '@/presentation/theme/tokens';
+import { CameraLensPicker } from './CameraLensPicker';
+import { useCameraLenses } from './use-camera-lenses';
 
 export interface CameraPlrViewProps {
   missionPhase: MissionPhase | null;
@@ -26,6 +28,7 @@ export function CameraPlrView({ missionPhase, onSaved }: CameraPlrViewProps) {
 
   const [eyeSide, setEyeSide] = useState<EyeSide>('left');
   const [facing, setFacing] = useState<'back' | 'front'>('back');
+  const lens = useCameraLenses(cameraRef, facing);
   const [cameraReady, setCameraReady] = useState(false);
   const [mountError, setMountError] = useState<string | null>(null);
 
@@ -46,6 +49,8 @@ export function CameraPlrView({ missionPhase, onSaved }: CameraPlrViewProps) {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const toggleFacing = useCallback(() => {
+    setCameraReady(false);
+    setMountError(null);
     setFacing((prev) => (prev === 'front' ? 'back' : 'front'));
   }, []);
 
@@ -168,10 +173,17 @@ export function CameraPlrView({ missionPhase, onSaved }: CameraPlrViewProps) {
           ref={cameraRef}
           style={styles.camera}
           facing={facing}
+          selectedLens={lens.selectedLens ?? undefined}
           enableTorch={flashActive}
           animateShutter={false}
-          onCameraReady={() => setCameraReady(true)}
+          onCameraReady={() => {
+            setCameraReady(true);
+            setMountError(null);
+            lens.handleCameraReady();
+          }}
+          onAvailableLensesChanged={lens.handleAvailableLensesChanged}
           onMountError={(e) => {
+            setCameraReady(false);
             setMountError(`Cámara: ${e.message}`);
           }}
         />
@@ -227,6 +239,15 @@ export function CameraPlrView({ missionPhase, onSaved }: CameraPlrViewProps) {
           </View>
         )}
       </View>
+
+      <CameraLensPicker
+        facing={facing}
+        status={lens.status}
+        options={lens.options}
+        selectedLens={lens.selectedLens}
+        onSelect={lens.selectLens}
+        disabled={isRunning || countdown !== null}
+      />
 
       {/* Controles de configuración previos */}
       {!isRunning && countdown === null && (
