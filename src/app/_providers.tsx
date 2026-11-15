@@ -65,6 +65,8 @@ interface AppServices {
   manageAccount: ManageAccountScopeUseCase;
   auth: ManageAuthUseCase;
   analysisRepository: SqliteAnalysisRepository;
+  observationRepository: SqliteObservationRepository;
+  identity: LocalSubjectIdentity;
   runTrendAnalysis: RunTrendAnalysisUseCase;
   listRecentActivity: ListRecentActivityUseCase;
   syncNow: SyncNowUseCase | null;
@@ -165,6 +167,8 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
               ids,
             ),
             analysisRepository,
+            observationRepository: repository,
+            identity,
             runTrendAnalysis: new RunTrendAnalysisUseCase(
               repository,
               analysisRepository,

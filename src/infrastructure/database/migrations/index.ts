@@ -6,6 +6,7 @@ import { MIGRATION_V4_STATEMENTS } from './v004-analysis-runs';
 import { MIGRATION_V5_STATEMENTS } from './v005-local-auth';
 import { MIGRATION_V6_STATEMENTS } from './v006-camera-inspection';
 import { MIGRATION_V7_STATEMENTS } from './v007-fix-symptom-nausea-code';
+import { applyMigrationV8 } from './v008-osdr-575-metabolic-catalog';
 import { METRIC_CATALOG_V1, METRIC_CATALOG_VERSION } from '@/domain/metrics/catalog-v1';
 
 export interface Migration {
@@ -118,6 +119,12 @@ export const MIGRATIONS: readonly Migration[] = [
       for (const sql of MIGRATION_V7_STATEMENTS) {
         await driver.exec(sql);
       }
+    },
+  },
+  {
+    version: 8,
+    async apply(driver) {
+      await applyMigrationV8(driver);
     },
   },
 ];

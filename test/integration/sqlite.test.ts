@@ -75,6 +75,9 @@ const { MIGRATION_V6_STATEMENTS } = await import(
 const { MIGRATION_V7_STATEMENTS } = await import(
   '../../src/infrastructure/database/migrations/v007-fix-symptom-nausea-code.ts'
 );
+const { applyMigrationV8 } = await import(
+  '../../src/infrastructure/database/migrations/v008-osdr-575-metabolic-catalog.ts'
+);
 const { METRIC_CATALOG_V1, METRIC_CATALOG_VERSION } = await import(
   '../../src/domain/metrics/catalog-v1.ts'
 );
@@ -431,3 +434,60 @@ test('migración v7: corrige symptom_nauseas en observaciones legacy y outbox de
   assert.equal(count?.n, 1);
 });
 
+
+test('migración v8: siembra los analitos del panel metabólico y citoquinas (OSD-575) de forma idempotente', async () => {
+  await applyMigrations(driver);
+  // Ejecutar migración v8
+  await applyMigrationV8(driver);
+  // Idempotencia: segunda ejecución sin fallar
+  await applyMigrationV8(driver);
+
+  const cmpIds = [
+    'glucose',
+    'creatinine',
+    'urea_nitrogen_bun',
+    'sodium',
+    'potassium',
+    'chloride',
+    'calcium',
+    'alt',
+    'ast',
+    'albumin',
+    'crp',
+  ];
+
+  for (const id of cmpIds) {
+    const row = await driver.getFirst<{ metric_id: string; canonical_unit: string }>(
+      'SELECT metric_id, canonical_unit FROM metric_definitions WHERE metric_id = ?',
+      [id],
+    );
+    assert.ok(row, `métrica ${id} debe existir tras migración v8`);
+    assert.equal(row.metric_id, id);
+    assert.ok(row.canonical_unit);
+  }
+
+  // Verificar que podemos registrar una sesión y observaciones con estas métricas sin violar FK
+  await driver.run(
+    `INSERT INTO measurement_sessions
+       (session_id, subject_id, mission_phase, recorded_at, recorded_local_date,
+        source, note, sync_state, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ['ses-osd575-test', 'subj-i4', 'postflight', '2021-09-19T14:00:00.000Z', '2021-09-19', 'nasa_osdr_osd575', 'Inspiration4 test', 'local_only', '2021-09-19T14:00:00.000Z'],
+  );
+
+  for (const id of cmpIds) {
+    await driver.run(
+      `INSERT INTO observations
+         (observation_id, session_id, metric_id, value_original, unit_original,
+          observed_at, local_date, quality_state, sync_state, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'ok', 'local_only', ?)`,
+      [`ses-osd575-test:${id}`, 'ses-osd575-test', id, 10, 'mg/dL', '2021-09-19T14:00:00.000Z', '2021-09-19', '2021-09-19T14:00:00.000Z'],
+    );
+  }
+
+  const count = await driver.getFirst<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM observations WHERE session_id = ?',
+    ['ses-osd575-test'],
+  );
+  assert.equal(count?.n, cmpIds.length);
+});

@@ -1,8 +1,8 @@
 import { dailyLogInputSchema, parseDailyLogInput } from '@/domain/observations/daily-log-schema';
-import { METRIC_CATALOG_V1 } from '@/domain/metrics/catalog-v1';
+import { METRIC_CATALOG_V1, getMetricDefinition } from '@/domain/metrics/catalog-v1';
 import { metricDefinitionSchema } from '@/domain/metrics/metric-definition';
 import { relativeAgeIso } from '@/domain/shared/relative-age';
-import { getMetricDefinition } from '@/domain/metrics/catalog-v1';
+
 
 const validBase = {
   observedAt: '2026-11-14T10:00:00.000Z',

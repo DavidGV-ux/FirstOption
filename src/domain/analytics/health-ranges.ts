@@ -83,6 +83,18 @@ const INFORMATIVE_RANGES: Record<string, InformativeRange> = {
   sleep_duration: { acceptMin: 7, acceptMax: 9, warnMin: 6, warnMax: 10, note: 'Duración referencial informativa (adultos).' },
   hemoglobin: { acceptMin: 120, acceptMax: 170, warnMin: 100, warnMax: 180, note: 'Rango referencial amplio (g/L), informativo; varía por sexo/contexto.' },
   hematocrit: { acceptMin: 36, acceptMax: 50, warnMin: 30, warnMax: 54, note: 'Rango referencial amplio (%), informativo.' },
+  // NASA OSDR OSD-575 / Inspiration4 Panel Metabólico y Citoquinas
+  glucose: { acceptMin: 70, acceptMax: 99, warnMin: 65, warnMax: 125, note: 'Glucosa sérica basal en ayunas referencial (mg/dL).' },
+  creatinine: { acceptMin: 0.6, acceptMax: 1.3, warnMin: 0.5, warnMax: 1.5, note: 'Creatinina sérica referencial (mg/dL); indicador renal.' },
+  urea_nitrogen_bun: { acceptMin: 7, acceptMax: 20, warnMin: 6, warnMax: 25, note: 'Nitrógeno ureico sérico / BUN (mg/dL).' },
+  sodium: { acceptMin: 135, acceptMax: 145, warnMin: 132, warnMax: 148, note: 'Sodio sérico referencial (mmol/L); osmolaridad.' },
+  potassium: { acceptMin: 3.5, acceptMax: 5.2, warnMin: 3.3, warnMax: 5.5, note: 'Potasio sérico referencial (mmol/L); función cardíaca.' },
+  chloride: { acceptMin: 96, acceptMax: 106, warnMin: 94, warnMax: 108, note: 'Cloro sérico referencial (mmol/L).' },
+  calcium: { acceptMin: 8.6, acceptMax: 10.3, warnMin: 8.2, warnMax: 10.7, note: 'Calcio sérico referencial (mg/dL); metabolismo óseo espacial.' },
+  alt: { acceptMin: 7, acceptMax: 55, warnMin: 5, warnMax: 70, note: 'Alanina aminotransferasa (U/L); enzima hepática.' },
+  ast: { acceptMin: 8, acceptMax: 48, warnMin: 6, warnMax: 60, note: 'Aspartato aminotransferasa (U/L); función celular.' },
+  albumin: { acceptMin: 3.5, acceptMax: 5.2, warnMin: 3.2, warnMax: 5.5, note: 'Albúmina sérica (g/dL); presión oncótica.' },
+  crp: { acceptMin: 0.0, acceptMax: 3.0, warnMin: 0.0, warnMax: 10.0, note: 'Proteína C reactiva (mg/L); biomarcador inflamatorio agudo.' },
 };
 
 export function statusColor(status: RangeStatus): string {

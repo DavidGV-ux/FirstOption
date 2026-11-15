@@ -7,6 +7,8 @@ import { useResponsive } from '@/presentation/hooks/use-responsive';
 import { cardStyle, palette, radius, spacing, typography } from '@/presentation/theme/tokens';
 import type { SessionWithObservations } from '@/domain/repositories/observation-repository';
 import { evaluateMetricRange, statusColor, statusLabelEs } from '@/domain/analytics/health-ranges';
+import { Osd575Service } from '@/infrastructure/nasa-osdr/osd-575-service';
+import type { Inspiration4CrewId } from '@/infrastructure/nasa-osdr/osd-575-data';
 import { getMetricDefinition } from '@/domain/metrics/catalog-v1';
 
 type TrendPoint = { at: string; value: number };
@@ -32,6 +34,19 @@ const WELLBEING = ['mood_self_report', 'stress_self_report', 'fatigue_self_repor
 const VITALS = ['heart_rate', 'bp_systolic', 'bp_diastolic', 'spo2'];
 const SYMPTOMS = ['symptom_headache', 'symptom_nausea', 'symptom_dizziness', 'symptom_msk_pain', 'symptom_visual_disturbance', 'symptom_nasal_congestion'];
 const HEMA = ['hemoglobin', 'hematocrit', 'rbc_count', 'mcv', 'rdw', 'reticulocyte_pct', 'reticulocyte_absolute', 'ferritin'];
+const CMP_OSDR = [
+  'glucose',
+  'creatinine',
+  'urea_nitrogen_bun',
+  'sodium',
+  'potassium',
+  'chloride',
+  'calcium',
+  'alt',
+  'ast',
+  'albumin',
+  'crp',
+];
 
 function buildMetricViews(sessions: SessionWithObservations[], ids: string[]): MetricView[] {
   return ids.map((metricId) => {
@@ -253,6 +268,9 @@ export default function EstadoGeneralScreen() {
   const [loading, setLoading] = useState(true);
   const [notifStatus, setNotifStatus] = useState<string | null>(null);
   const [selectedMetricId, setSelectedMetricId] = useState<string | null>(null);
+  const [selectedCrew, setSelectedCrew] = useState<Inspiration4CrewId>('C001');
+  const [seedingStatus, setSeedingStatus] = useState<string | null>(null);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -269,9 +287,30 @@ export default function EstadoGeneralScreen() {
   const vitals = useMemo(() => buildMetricViews(sessions, VITALS), [sessions]);
   const symptoms = useMemo(() => buildMetricViews(sessions, SYMPTOMS), [sessions]);
   const hema = useMemo(() => buildMetricViews(sessions, HEMA), [sessions]);
-  const allKey = useMemo(() => [...wellbeing, ...vitals, ...hema], [wellbeing, vitals, hema]);
+  const metabolic = useMemo(() => buildMetricViews(sessions, CMP_OSDR), [sessions]);
+  const allKey = useMemo(() => [...wellbeing, ...vitals, ...hema, ...metabolic], [wellbeing, vitals, hema, metabolic]);
   const summary = useMemo(() => overallSummary(allKey), [allKey]);
-  const allMetrics = useMemo(() => [...wellbeing, ...vitals, ...symptoms, ...hema], [wellbeing, vitals, symptoms, hema]);
+  const allMetrics = useMemo(() => [...wellbeing, ...vitals, ...symptoms, ...hema, ...metabolic], [wellbeing, vitals, symptoms, hema, metabolic]);
+
+  const loadAstronautData = useCallback(async () => {
+    setIsSeeding(true);
+    setSeedingStatus(null);
+    try {
+      const subjectId = await services.identity.getOrCreateSubjectId();
+      const res = await Osd575Service.seedCrewToRepository(
+        services.observationRepository,
+        selectedCrew,
+        subjectId,
+      );
+      await load();
+      setSeedingStatus(`Datos cargados: ${res.sessionsCreated} momentos de misión (${res.observationsCreated} analitos) de ${selectedCrew} sincronizados.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSeedingStatus(`Error al cargar datos: ${msg}`);
+    } finally {
+      setIsSeeding(false);
+    }
+  }, [services, selectedCrew, load]);
   const selected = useMemo(() => allMetrics.find((m) => m.metricId === selectedMetricId) ?? null, [allMetrics, selectedMetricId]);
   const selectedTrend = useMemo(() => (selected ? assessTrend(selected) : null), [selected]);
 
@@ -356,6 +395,46 @@ export default function EstadoGeneralScreen() {
           <Card title="Sin estudios hematológicos"><Text style={styles.body}>Aún no hay registros hematológicos para mostrar evolución y rangos informativos.</Text></Card>
         ) : (
           hema.filter((m) => m.latest !== null || m.points.length > 0).map((m) => <MetricCard key={m.metricId} m={m} onPress={() => setSelectedMetricId(m.metricId)} />)
+        )}
+
+        <SectionHeader title="Panel Metabólico y Citoquinas (NASA OSDR OSD-575)" />
+        <Text style={styles.sectionHint}>Estudio SpaceX Inspiration4: 11 biomarcadores séricos en 7 momentos de misión (L-92 a R+194).</Text>
+        <Card title="Explorador de Datos Espaciales Inspiration4">
+          <Text style={styles.body}>
+            Respuesta fisiológica de los 4 astronautas civiles ante la microgravedad orbital (LSDS-8 y EvePanel). Carga la serie temporal de un tripulante en tu perfil.
+          </Text>
+          <View style={styles.crewSelectorRow}>
+            {(['C001', 'C002', 'C003', 'C004'] as const).map((c) => (
+              <Pressable
+                key={c}
+                accessibilityRole="button"
+                onPress={() => setSelectedCrew(c)}
+                style={[styles.crewBtn, selectedCrew === c && styles.crewBtnSelected]}
+              >
+                <Text style={[styles.crewBtnText, selectedCrew === c && styles.crewBtnTextSelected]}>
+                  {c}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            disabled={isSeeding}
+            onPress={() => void loadAstronautData()}
+            style={({ pressed }) => [styles.primaryBtn, pressed && styles.pressed, isSeeding && { opacity: 0.6 }]}
+          >
+            <Text style={styles.primaryBtnText}>
+              {isSeeding ? 'Cargando datos espaciales…' : `Cargar datos de ${selectedCrew} (7 fases de vuelo)`}
+            </Text>
+          </Pressable>
+          {seedingStatus ? <Text style={[styles.body, { marginTop: spacing.xs, color: palette.accent }]}>{seedingStatus}</Text> : null}
+        </Card>
+        {metabolic.every((m) => m.latest === null) ? (
+          <Card title="Sin registros de panel metabólico">
+            <Text style={styles.body}>Carga un tripulante de Inspiration4 arriba para visualizar evolución de glucosa, función renal, electrolitos y PCR.</Text>
+          </Card>
+        ) : (
+          metabolic.filter((m) => m.latest !== null || m.points.length > 0).map((m) => <MetricCard key={m.metricId} m={m} onPress={() => setSelectedMetricId(m.metricId)} />)
         )}
 
         <SectionHeader title="Análisis por patrones de voz" />
@@ -508,4 +587,9 @@ const styles = StyleSheet.create({
   dayVal: { ...typography.body, fontWeight: '700' },
   closeBtn: { minHeight: 44, borderRadius: 14, borderWidth: 1, borderColor: palette.accent, alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg },
   closeBtnText: { ...typography.secondary, color: palette.accent, fontWeight: '700' },
+  crewSelectorRow: { flexDirection: 'row', gap: spacing.sm, marginVertical: spacing.xs },
+  crewBtn: { flex: 1, minHeight: 36, borderRadius: radius.sm, borderWidth: 1, borderColor: palette.border, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surfaceAlt },
+  crewBtnSelected: { borderColor: palette.accent, backgroundColor: `${palette.accent}22` },
+  crewBtnText: { ...typography.small, color: palette.textSecondary, fontWeight: '600' },
+  crewBtnTextSelected: { color: palette.accent, fontWeight: '700' },
 });
