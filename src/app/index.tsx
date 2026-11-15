@@ -200,7 +200,7 @@ export default function HomeScreen() {
           <Text style={styles.welcomeTitle} numberOfLines={2} ellipsizeMode="tail">
             Hola{displayName ? `, ${displayName}` : accountScope?.email ? `, ${accountScope.email.split('@')[0]}` : ''}.
           </Text>
-          <Text style={styles.welcomeText} numberOfLines={3} ellipsizeMode="tail">
+          <Text style={styles.welcomeText}>
             Haz seguimiento de tu bienestar, registra tus mediciones y consulta tu evolución en un solo lugar.
           </Text>
           <Pressable
@@ -240,9 +240,9 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={[styles.activity, { overflow: 'hidden' }]}>
+        <View style={styles.activity}>
           <View style={styles.activityIcon}><Text style={styles.activityIconText}>!</Text></View>
-          <View style={{ flex: 1, minWidth: 0, width: '100%' }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.activityTitle} numberOfLines={1} ellipsizeMode="tail">Actividad reciente</Text>
             <Text style={[styles.activityText, { zIndex: 1 }]}>
               {entry
@@ -346,18 +346,18 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: palette.background },
   content: { paddingBottom: spacing.xxl, gap: spacing.md },
-  topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
+  topbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   brand: { fontSize: 27, fontWeight: '700', letterSpacing: -1, color: palette.textPrimary },
   brandAccent: { color: palette.accent },
   topActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: palette.surfaceAlt, borderWidth: 1, borderColor: palette.border, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: palette.textPrimary, fontSize: 13, fontWeight: '600' },
-  statusRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', marginBottom: spacing.lg },
+  statusRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', marginBottom: spacing.xl },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: palette.border, borderRadius: 30, paddingVertical: 7, paddingHorizontal: 11, backgroundColor: palette.surfaceAlt },
   pillText: { fontSize: 11, color: palette.textPrimary },
   dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: palette.success },
-  welcome: { flexDirection: 'column', gap: spacing.lg, marginBottom: spacing.xl },
+  welcome: { flexDirection: 'column', gap: spacing.xl, marginBottom: spacing.xxl },
   eyebrow: { fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: palette.accent, fontWeight: '700', marginBottom: spacing.xs },
   welcomeTitle: { fontSize: 26, letterSpacing: -1, fontWeight: '700', color: palette.textPrimary },
   welcomeText: { ...typography.body, color: palette.textPrimary, lineHeight: 1.8, marginBottom: spacing.lg },
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
   metricLabel: { color: palette.textPrimary, fontSize: 11, lineHeight: 16 },
   metricValue: { fontSize: 28, fontWeight: '700', letterSpacing: -1, color: palette.textPrimary, lineHeight: 1 },
   metricNote: { fontSize: 10, fontWeight: '600', lineHeight: 15 },
-  activity: { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, padding: spacing.lg, flexDirection: 'row', gap: spacing.lg, alignItems: 'flex-start', marginBottom: spacing.xl },
+  activity: { backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, padding: spacing.lg, flexDirection: 'row', gap: spacing.lg, alignItems: 'flex-start', marginBottom: spacing.xxl },
   activityIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,181,71,0.12)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   activityIconText: { color: palette.attention, fontWeight: '700' },
   activityTitle: { fontSize: 15, fontWeight: '600', color: palette.textPrimary, marginBottom: spacing.xs },
