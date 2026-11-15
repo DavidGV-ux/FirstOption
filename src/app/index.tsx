@@ -244,7 +244,7 @@ export default function HomeScreen() {
           <View style={styles.activityIcon}><Text style={styles.activityIconText}>!</Text></View>
           <View style={{ flex: 1, minWidth: 0, width: '100%' }}>
             <Text style={styles.activityTitle} numberOfLines={1} ellipsizeMode="tail">Actividad reciente</Text>
-            <Text style={[styles.activityText, { zIndex: 1 }]} numberOfLines={2} ellipsizeMode="tail">
+            <Text style={[styles.activityText, { zIndex: 1 }]}>
               {entry
                 ? `${entry.summaryParts.length > 0 ? entry.summaryParts.join(' · ') : 'Sesión registrada'} · ${entry.syncState === 'local_only' ? 'solo en dispositivo' : entry.syncState}`
                 : 'Tu información está al día. Los registros nuevos aparecerán aquí.'}
@@ -357,10 +357,10 @@ const styles = StyleSheet.create({
   pill: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: palette.border, borderRadius: 30, paddingVertical: 7, paddingHorizontal: 11, backgroundColor: palette.surfaceAlt },
   pillText: { fontSize: 11, color: palette.textPrimary },
   dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: palette.success },
-  welcome: { flexDirection: 'column', gap: spacing.sm, marginBottom: spacing.md },
+  welcome: { flexDirection: 'column', gap: spacing.md, marginBottom: spacing.md },
   eyebrow: { fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: palette.accent, fontWeight: '600', marginBottom: spacing.xs },
   welcomeTitle: { fontSize: 26, letterSpacing: -1, fontWeight: '700', color: palette.textPrimary },
-  welcomeText: { ...typography.body, color: palette.textPrimary, lineHeight: 1.7, marginBottom: spacing.sm },
+  welcomeText: { ...typography.body, color: palette.textPrimary, lineHeight: 1.7, marginBottom: spacing.md },
   primaryCta: { borderRadius: 14, backgroundColor: palette.accent, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0, minHeight: 48 },
   primaryCtaText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.lg, marginBottom: spacing.sm },
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   activityIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(255,181,71,0.12)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   activityIconText: { color: palette.attention, fontWeight: '700' },
   activityTitle: { fontSize: 14, fontWeight: '600', color: palette.textPrimary, marginBottom: spacing.xs },
-  activityText: { fontSize: 13, color: palette.textPrimary, lineHeight: 1.7, flex: 1, flexShrink: 1 },
+  activityText: { fontSize: 14, color: palette.textPrimary, lineHeight: 1.7, flex: 1, flexShrink: 1 },
   quickGrid: { flexDirection: 'row', gap: 12, flexWrap: 'wrap', marginBottom: spacing.lg },
   quick: { flex: 1, minWidth: '33%', backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, borderRadius: radius.lg, padding: spacing.md, minHeight: 128, justifyContent: 'space-between', gap: spacing.xs },
   quickPressed: { borderColor: 'rgba(10,132,255,0.6)', backgroundColor: palette.surfaceAlt },
