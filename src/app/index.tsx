@@ -170,7 +170,13 @@ export default function HomeScreen() {
             <Text style={[styles.brand, styles.brandAccent]}>Option</Text>
           </View>
           <View style={styles.topActions}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Tu cuenta" onPress={() => router.push('/acceso')} style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Tu cuenta" onPress={() => {
+              if (authState === 'signed_in') {
+                void router.push('/perfil');
+              } else {
+                void router.push('/acceso');
+              }
+            }} style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}>
               <Text style={styles.avatarText}>{userInitials}</Text>
             </Pressable>
           </View>

@@ -23,6 +23,7 @@ export default function RootLayout() {
         <Stack.Screen name="linterna" options={{ title: 'Linterna de inspección' }} />
         <Stack.Screen name="analisis" options={{ title: 'Análisis descriptivo' }} />
         <Stack.Screen name="estado" options={{ title: 'Estado general' }} />
+        <Stack.Screen name="perfil" options={{ title: 'Perfil' }} />
       </Stack>
     </AppServicesProvider>
   );
