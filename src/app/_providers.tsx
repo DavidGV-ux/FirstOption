@@ -45,6 +45,7 @@ import {
   isSupabaseConfigured,
 } from '@/infrastructure/supabase/client';
 import { palette, spacing, typography } from '@/presentation/theme/tokens';
+import { useAutoSync } from '@/hooks/use-auto-sync';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   // Si el control del splash ya se perdió, seguimos sin bloquear la app.
@@ -212,6 +213,13 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  // Sincronización automática al recuperar internet (solo cuando hay servicios listos).
+  const readyServices = state.phase === 'ready' ? state.services : null;
+  useAutoSync({
+    syncNow: readyServices?.syncNow ?? null,
+    supabase: readyServices?.supabase ?? null,
+  });
 
   if (state.phase === 'loading') {
     return null;

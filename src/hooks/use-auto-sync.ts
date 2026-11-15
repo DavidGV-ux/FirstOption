@@ -1,6 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
 import NetInfo from '@react-native-community/netinfo';
-import { useAppServices } from '../_providers';
 
 /**
  * Hook que sincroniza automáticamente cuando se recupera la conexión a internet.
@@ -12,8 +11,13 @@ import { useAppServices } from '../_providers';
  * - Nunca sobrescribe datos: usa el mismo flujo idempotente de sync-now.
  * - Los errores de sync automático se silencian (no interrumpen la UI).
  */
-export function useAutoSync() {
-  const services = useAppServices();
+export function useAutoSync({
+  syncNow,
+  supabase,
+}: {
+  syncNow: { execute: () => Promise<unknown> } | null;
+  supabase: { auth: { getSession: () => Promise<{ data: { session: { user: { id: string } | null } | null } }> } } | null;
+}) {
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scheduleSync = useCallback(() => {
@@ -22,14 +26,14 @@ export function useAutoSync() {
     }
     syncTimeoutRef.current = setTimeout(async () => {
       try {
-        if (services.syncNow === null || services.supabase === null) {
+        if (syncNow === null || supabase === null) {
           return;
         }
-        const { data: sessionData } = await services.supabase.auth.getSession();
+        const { data: sessionData } = await supabase.auth.getSession();
         if (!sessionData?.session) {
           return;
         }
-        await services.syncNow.execute();
+        await syncNow.execute();
       } catch {
         // Errores de sync automático no se muestran al usuario;
         // el botón manual de Sincronizar sigue disponible.
@@ -37,7 +41,7 @@ export function useAutoSync() {
         syncTimeoutRef.current = null;
       }
     }, 2000);
-  }, [services]);
+  }, [syncNow, supabase]);
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import DateTimePicker, {
@@ -13,6 +14,8 @@ import { PrimaryButton, FormError } from '@/presentation/components/screen';
 import { REGISTER_SCALES, REGISTER_SYMPTOMS } from '@/presentation/features/register/scale-config';
 import { cardStyle, palette, radius, spacing, typography } from '@/presentation/theme/tokens';
 import { useAppServices } from './_providers';
+
+const DRAFT_KEY = 'firstOption_draft_register';
 
 type FormValues = DailyLogInput;
 
@@ -42,6 +45,8 @@ export default function RegisterScreen() {
     control,
     handleSubmit,
     setError,
+    getValues,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(dailyLogInputSchema as any),
@@ -62,6 +67,68 @@ export default function RegisterScreen() {
     },
     mode: 'onBlur',
   });
+
+  // Guardar borrador en SecureStore cada vez que cambian los valores,
+  // para que no se pierdan al navegar a otras pantallas (ej. linterna/pulso)
+  // y regresar.
+  const draftValues = useMemo(
+    () => ({
+      missionPhase: getValues('missionPhase'),
+      mood: getValues('mood'),
+      stress: getValues('stress'),
+      fatigue: getValues('fatigue'),
+      sleepQuality: getValues('sleepQuality'),
+      sleepHours: getValues('sleepHours'),
+      heartRate: getValues('heartRate'),
+      bpSystolic: getValues('bpSystolic'),
+      bpDiastolic: getValues('bpDiastolic'),
+      spo2: getValues('spo2'),
+      symptoms: getValues('symptoms'),
+      note: getValues('note'),
+      observedAt: getValues('observedAt'),
+    }),
+    [getValues],
+  );
+
+  useEffect(() => {
+    void SecureStore.setItemAsync(DRAFT_KEY, JSON.stringify(draftValues));
+  }, [draftValues]);
+
+  // Restaurar borrador guardado al montar, a menos que haya llegado con
+  // valores estimados desde la linterna/pulso (esos tienen prioridad).
+  useEffect(() => {
+    const hasExplicitParams =
+      params.estHeartRate !== undefined ||
+      params.estBpSystolic !== undefined ||
+      params.estBpDiastolic !== undefined ||
+      params.estSpo2 !== undefined;
+
+    if (!hasExplicitParams) {
+      (async () => {
+        try {
+          const saved = await SecureStore.getItemAsync(DRAFT_KEY);
+          if (saved) {
+            const draft = JSON.parse(saved);
+            if (draft.missionPhase) setValue('missionPhase', draft.missionPhase);
+            if (draft.mood !== undefined) setValue('mood', draft.mood);
+            if (draft.stress !== undefined) setValue('stress', draft.stress);
+            if (draft.fatigue !== undefined) setValue('fatigue', draft.fatigue);
+            if (draft.sleepQuality !== undefined) setValue('sleepQuality', draft.sleepQuality);
+            if (draft.sleepHours !== undefined) setValue('sleepHours', draft.sleepHours);
+            if (draft.heartRate !== undefined) setValue('heartRate', draft.heartRate);
+            if (draft.bpSystolic !== undefined) setValue('bpSystolic', draft.bpSystolic);
+            if (draft.bpDiastolic !== undefined) setValue('bpDiastolic', draft.bpDiastolic);
+            if (draft.spo2 !== undefined) setValue('spo2', draft.spo2);
+            if (draft.symptoms) setValue('symptoms', draft.symptoms);
+            if (draft.note !== undefined) setValue('note', draft.note);
+            if (draft.observedAt) setValue('observedAt', draft.observedAt);
+          }
+        } catch {
+          // Ignorar errores de lectura del borrador.
+        }
+      })();
+    }
+  }, [setValue, params.estHeartRate, params.estBpSystolic, params.estBpDiastolic, params.estSpo2]);
 
   const onSubmit = handleSubmit(
     async (values) => {

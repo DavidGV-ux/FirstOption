@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: radius.md,
     overflow: 'hidden',
-    backgroundColor: '#000000',
+    backgroundColor: palette.background,
     position: 'relative',
     borderWidth: 2,
     borderColor: palette.accent,
@@ -440,12 +440,12 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: 'rgba(16, 19, 24, 0.7)',
     justifyContent: 'space-between',
     padding: spacing.sm,
   },
   fingerHintBox: {
-    backgroundColor: 'rgba(23, 43, 58, 0.85)',
+    backgroundColor: 'rgba(25, 38, 53, 0.9)',
     borderRadius: radius.sm,
     padding: spacing.sm,
     gap: 2,
@@ -453,11 +453,11 @@ const styles = StyleSheet.create({
   fingerHintTitle: {
     ...typography.secondary,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: palette.textPrimary,
   },
   fingerHintSub: {
     ...typography.small,
-    color: '#E1EBF0',
+    color: palette.textSecondary,
   },
   progressContainer: {
     gap: 4,
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
   progressBarBg: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     overflow: 'hidden',
   },
   progressBarFill: {
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     ...typography.small,
-    color: '#FFFFFF',
+    color: palette.textPrimary,
     fontWeight: '600',
     textAlign: 'center',
   },
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.md,
     borderColor: palette.accent,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: palette.surface,
   },
   cardHeader: {
     ...typography.subtitle,
@@ -532,8 +532,8 @@ const styles = StyleSheet.create({
     color: palette.textSecondary,
   },
   sqiBadge: {
-    backgroundColor: '#E8F5E9',
-    borderColor: '#2E7D32',
+    backgroundColor: 'rgba(69,197,138,0.14)',
+    borderColor: palette.success,
     borderWidth: 1,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
   },
   sqiText: {
     ...typography.small,
-    color: '#2E7D32',
+    color: palette.success,
     fontWeight: '700',
   },
   grid: {

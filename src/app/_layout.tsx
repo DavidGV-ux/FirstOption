@@ -2,10 +2,8 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AppServicesProvider } from './_providers';
 import { palette } from '@/presentation/theme/tokens';
-import { useAutoSync } from './hooks/use-auto-sync';
 
 export default function RootLayout() {
-  useAutoSync();
   return (
     <AppServicesProvider>
       <StatusBar style="light" />
