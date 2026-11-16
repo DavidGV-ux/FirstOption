@@ -12,7 +12,7 @@
  * Cambia CACHE_NAME en cada release para invalidar el caché anterior.
  */
 
-const CACHE_NAME = 'firstoption-v1';
+const CACHE_NAME = 'firstoption-v2';
 
 const APP_SHELL = [
   './',
