@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import type { EncryptionKeyProvider } from '../security/db-key-store';
 import type { SqlDriver } from './driver';
@@ -26,6 +27,11 @@ export interface OpenedDatabase {
   cipherVersion: string | null;
   /** false solo en modo de prueba sin cifrado (Expo Go), con banner visible. */
   encrypted: boolean;
+  /**
+   * false solo en web sin OPFS (Safari/iOS): la base vive en memoria y los
+   * datos locales no sobreviven al cierre de la sesión. Con aviso visible.
+   */
+  persistent: boolean;
 }
 
 /**
@@ -46,8 +52,35 @@ export function isUnencryptedDemoModeAllowed(): boolean {
  * SQLCipher, `PRAGMA key` NO lanza error y la base quedaría sin
  * cifrar. Por eso se consulta `PRAGMA cipher_version` ANTES de
  * escribir nada y se decide de forma explícita.
+ *
+ * En web sin OPFS (Safari/iOS no expone handles síncronos) la base
+ * persistente no se puede abrir: se degrada a memoria con aviso
+ * visible, nunca en silencio, para no bloquear la app.
  */
 export async function openAppDatabase(
+  databaseName: string,
+  keys: EncryptionKeyProvider,
+): Promise<OpenedDatabase> {
+  try {
+    return await openPersistentDatabase(databaseName, keys);
+  } catch (error) {
+    if (Platform.OS === 'web' && !(error instanceof DatabaseEncryptionUnavailableError)) {
+      const db = await SQLite.openDatabaseAsync(':memory:');
+      const driver: SqlDriver = new ExpoSqlDriver(db);
+      const schemaVersion = await migrateIfNeeded(driver);
+      return {
+        driver,
+        schemaVersion,
+        cipherVersion: null,
+        encrypted: false,
+        persistent: false,
+      };
+    }
+    throw error;
+  }
+}
+
+async function openPersistentDatabase(
   databaseName: string,
   keys: EncryptionKeyProvider,
 ): Promise<OpenedDatabase> {
@@ -68,7 +101,7 @@ export async function openAppDatabase(
     // Modo Expo Go explícito: base separada, sin clave, aviso visible.
     const driver: SqlDriver = new ExpoSqlDriver(db);
     const schemaVersion = await migrateIfNeeded(driver);
-    return { driver, schemaVersion, cipherVersion: null, encrypted: false };
+    return { driver, schemaVersion, cipherVersion: null, encrypted: false, persistent: true };
   }
 
   const key = await keys.getOrCreateKey();
@@ -78,5 +111,5 @@ export async function openAppDatabase(
 
   const driver: SqlDriver = new ExpoSqlDriver(db);
   const schemaVersion = await migrateIfNeeded(driver);
-  return { driver, schemaVersion, cipherVersion, encrypted: true };
+  return { driver, schemaVersion, cipherVersion, encrypted: true, persistent: true };
 }

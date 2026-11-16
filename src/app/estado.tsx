@@ -411,7 +411,7 @@ export default function EstadoGeneralScreen() {
         )}
 
         <SectionHeader title="Panel Metabólico y Citoquinas (NASA OSDR OSD-575)" />
-        <Text style={styles.sectionHint}>Estudio SpaceX Inspiration4: 11 biomarcadores séricos en 7 momentos de misión (L-92 a R+194).</Text>
+        <Text style={styles.sectionHint}>Estudio SpaceX Inspiration4: 11 biomarcadores séricos en 7 momentos de misión (L-92 a R+194). Material de referencia; no son tus mediciones.</Text>
         <Card title="Explorador de Datos Espaciales Inspiration4">
           <Text style={styles.body}>
             Respuesta fisiológica de los 4 astronautas civiles ante la microgravedad orbital (LSDS-8 y EvePanel). Carga la serie temporal de un tripulante para explorarla en la app.

@@ -101,9 +101,12 @@ La app corre como PWA instalable sobre el mismo código Expo Router:
 
 **Límites en web (no se pierden funciones, pero cambia el soporte de plataforma):**
 - SQLite en web usa wa-sqlite **sin SQLCipher**: la PWA abre la base en modo sin cifrar (el mismo modo de aviso permanente que Expo Go). Por eso el build web fija `EXPO_PUBLIC_ALLOW_UNENCRYPTED_DB=1` y no depende del `.env` local.
+- **Safari/iOS no expone handles síncronos de OPFS**: si la base persistente no se puede abrir, la app degrada a memoria con banner permanente (los registros locales no sobreviven al cierre de la sesión; los de la cuenta se recuperan al sincronizar). Android/Chrome y Safari de escritorio mantienen la base persistente.
 - La cámara (PLR/PPG) necesita **HTTPS** (o `localhost`) por `getUserMedia`; el flash/linterna solo está disponible si el navegador expone `torch` (Android Chrome normalmente sí; iOS/escritorio no).
 - Notificaciones locales (recordatorio diario) no están soportadas en web: la app lo indica con mensaje explícito, sin romperse.
 - El service worker solo existe en el build servido; en `expo start --web` (dev) no se registra.
+
+**Builds nativos (EAS):** `eas.json` ahora lleva `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_ANON_KEY` en los perfiles `development`, `preview` y `production`. Sin ellas la APK compilaba sin sincronización: no aparecía el historial remoto de la cuenta (sí en la PWA, que toma las variables del `.env` local al exportar). Tras cambiar `eas.json` hay que **recompilar la APK** para que el binario reciba las variables.
 
 ## Comandos verificados (última actualización local)
 ```

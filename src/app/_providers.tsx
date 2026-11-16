@@ -102,7 +102,7 @@ export function useAppServices(): AppServices {
 
 type BootState =
   | { phase: 'loading' }
-  | { phase: 'ready'; services: AppServices; encrypted: boolean }
+  | { phase: 'ready'; services: AppServices; encrypted: boolean; persistent: boolean }
   | { phase: 'error'; kind: 'encryption'; message: string };
 
 /**
@@ -250,6 +250,7 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
             remoteConfigured: supabase !== null,
           },
           encrypted: opened.encrypted,
+          persistent: opened.persistent,
         });
       } catch (error) {
         if (cancelled) return;
@@ -273,6 +274,7 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
 
   // Sincronización automática al recuperar internet (solo cuando hay servicios listos).
   const readyServices = state.phase === 'ready' ? state.services : null;
+  const nonPersistentStorage = state.phase === 'ready' && !state.persistent;
   useAutoSync({
     syncNow: readyServices?.syncNow ?? null,
     pullRemoteHistory: readyServices?.pullRemoteHistory ?? null,
@@ -293,6 +295,7 @@ export function AppServicesProvider({ children }: { children: ReactNode }) {
     <AppServicesContext.Provider value={state.services}>
       <View style={styles.root}>
         {!state.encrypted && <UnencryptedModeBanner />}
+        {nonPersistentStorage && <SessionOnlyStorageBanner />}
         {notice !== null && (
           <View style={styles.notice} accessible accessibilityRole="alert">
             <Text style={styles.noticeText}>{notice}</Text>
@@ -323,6 +326,23 @@ function UnencryptedModeBanner() {
     >
       <Text style={styles.bannerText}>
         Modo Expo Go: datos guardados sin cifrado en este dispositivo.
+      </Text>
+    </View>
+  );
+}
+
+/** Banner permanente: web sin OPFS (Safari/iOS), base solo en memoria. */
+function SessionOnlyStorageBanner() {
+  return (
+    <View
+      accessible
+      accessibilityRole="alert"
+      accessibilityLabel="Este navegador no permite guardar la base local: tus registros locales viven solo en esta sesión; los de tu cuenta se recuperan al sincronizar."
+      style={styles.banner}
+    >
+      <Text style={styles.bannerText}>
+        Sin almacenamiento local en este navegador: tus registros locales
+        viven solo en esta sesión; los de tu cuenta se recuperan al sincronizar.
       </Text>
     </View>
   );
