@@ -53,7 +53,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:integration": "node --test test/integration/sqlite.test.ts",
-    "build:dev": "eas build --profile development --platform android"
+    "build:dev": "eas build --profile development --platform android",
+    "build:web": "EXPO_PUBLIC_ALLOW_UNENCRYPTED_DB=1 expo export -p web && node scripts/generate-precache.js"
   },
   "jest": {
     "preset": "jest-expo",

@@ -89,6 +89,22 @@
 - Validación de calidad, privacidad (imágenes en sandbox, sin subida por defecto) y exactitud de estimaciones experimentales (pupila/pulso).
 - Pruebas E2E de flujos completos.
 
+## PWA (rama `pwa`)
+
+La app corre como PWA instalable sobre el mismo código Expo Router:
+
+- `public/manifest.json` + iconos 192/512/maskable (generados desde `assets/images/icon.png`).
+- `src/app/+html.tsx`: enlaza el manifest y registra el service worker en el render estático.
+- `public/sw.js`: precarga el shell + `precache-manifest.json` (bundles con hash y HTML de cada ruta); navegaciones red-primero con respaldo a caché, assets caché-primero. Para releases nuevos, subir `CACHE_NAME`.
+- `scripts/generate-precache.js`: tras el export genera `dist/precache-manifest.json`, `dist/_redirects` (URLs limpias + fallback SPA para Netlify/Cloudflare Pages) y `dist/404.html` (fallback SPA para GitHub Pages).
+- `npm run build:web` = `EXPO_PUBLIC_ALLOW_UNENCRYPTED_DB=1 expo export -p web && node scripts/generate-precache.js`.
+
+**Límites en web (no se pierden funciones, pero cambia el soporte de plataforma):**
+- SQLite en web usa wa-sqlite **sin SQLCipher**: la PWA abre la base en modo sin cifrar (el mismo modo de aviso permanente que Expo Go). Por eso el build web fija `EXPO_PUBLIC_ALLOW_UNENCRYPTED_DB=1` y no depende del `.env` local.
+- La cámara (PLR/PPG) necesita **HTTPS** (o `localhost`) por `getUserMedia`; el flash/linterna solo está disponible si el navegador expone `torch` (Android Chrome normalmente sí; iOS/escritorio no).
+- Notificaciones locales (recordatorio diario) no están soportadas en web: la app lo indica con mensaje explícito, sin romperse.
+- El service worker solo existe en el build servido; en `expo start --web` (dev) no se registra.
+
 ## Comandos verificados (última actualización local)
 ```
 npx tsc --noEmit          # OK
