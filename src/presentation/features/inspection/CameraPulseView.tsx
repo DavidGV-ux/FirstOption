@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { CameraView } from 'expo-camera';
+import { Platform } from 'react-native';
 import { router } from 'expo-router';
 import type { PulseEstimate } from '@/domain/camera-inspection/entities/pulse-estimate';
 import type { MissionPhase } from '@/domain/observations/observation';
@@ -27,6 +28,7 @@ const FINGER_RECOMMENDATIONS =
 export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps) {
   const services = useAppServices();
   const cameraRef = useRef<CameraView>(null);
+  const containerRef = useRef<any>(null);
   const processor = useMemo(() => new PpgProcessor(), []);
   const lens = useCameraLenses(cameraRef, 'back');
 
@@ -144,6 +146,74 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
           : `Se capturaron ${sampleCount} muestras en el último intento pero no se identificó un pulso claro tras 3 intentos.`;
       setErrorMsg(`${base}\n\n${FINGER_RECOMMENDATIONS}`);
     };
+
+    // En web, capturar fotogramas directamente del <video> con canvas
+    // (getImageData) evita el round-trip JPEG+base64 de takePictureAsync,
+    // que era lo que hacía el muestreo ~3-5 Hz y la baja sensibilidad.
+    // Así la PWA muestra el pulso en tiempo real igual que la app nativa.
+    if (Platform.OS === 'web') {
+      const interval = setInterval(() => {
+        if (cancelled) return;
+        const elapsed = Date.now() - startTime;
+        setProgress(Math.min(100, Math.round((elapsed / targetDuration) * 100)));
+
+        if (elapsed >= targetDuration) {
+          const count = samplesRef.current.length;
+          const est = count >= 3 ? processor.process(samplesRef.current) : null;
+          finishAttempt(est, count);
+          clearInterval(interval);
+          return;
+        }
+
+        const video = (containerRef.current as any)?.querySelector?.('video') as
+          | (HTMLVideoElement & { readyState: number; videoWidth: number; videoHeight: number })
+          | null;
+        if (video && video.readyState >= 2 && video.videoWidth > 0 && cameraReady) {
+          try {
+            const w = 32;
+            const h = 24;
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, w, h);
+              const data = ctx.getImageData(0, 0, w, h).data;
+              let rSum = 0;
+              let gSum = 0;
+              let bSum = 0;
+              let px = 0;
+              for (let i = 0; i < data.length; i += 4) {
+                rSum += data[i];
+                gSum += data[i + 1];
+                bSum += data[i + 2];
+                px++;
+              }
+              if (px > 0) {
+                const sample: PpgSample = {
+                  timestampMs: Date.now(),
+                  red: rSum / px,
+                  green: gSum / px,
+                  blue: bSum / px,
+                };
+                setFingerDetected(processor.isFingerDetected(sample));
+                samplesRef.current = [...samplesRef.current, sample];
+                if (samplesRef.current.length >= 3) {
+                  setCurrentPulse(processor.process(samplesRef.current));
+                }
+              }
+            }
+          } catch {
+            captureFailuresRef.current += 1;
+          }
+        }
+      }, 100);
+
+      return () => {
+        cancelled = true;
+        clearInterval(interval);
+      };
+    }
 
     const sampleOnce = async () => {
       if (cancelled) return;
@@ -283,7 +353,7 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
   return (
     <View style={styles.container}>
       {/* Vista de cámara trasera con linterna activa para PPG */}
-      <View style={styles.cameraBox}>
+      <View style={styles.cameraBox} ref={containerRef}>
         <CameraView
           key={cameraKey}
           ref={cameraRef}
@@ -298,6 +368,14 @@ export function CameraPulseView({ missionPhase, onSaved }: CameraPulseViewProps)
             setMountError(null);
             lens.handleCameraReady();
             void pickSmallestPictureSize();
+            if (Platform.OS === 'web') {
+              const supported = (navigator as any)?.mediaDevices?.getSupportedConstraints?.()?.torch === true;
+              if (!supported) {
+                setInfoMsg(
+                  'Este navegador no expone la linterna (torch): la medición PPG necesita luz. Mejor resultado en Android Chrome o en un development build.',
+                );
+              }
+            }
           }}
           onAvailableLensesChanged={lens.handleAvailableLensesChanged}
           onMountError={(e) => {
