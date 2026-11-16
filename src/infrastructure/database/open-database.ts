@@ -4,6 +4,7 @@ import type { EncryptionKeyProvider } from '../security/db-key-store';
 import type { SqlDriver } from './driver';
 import { ExpoSqlDriver } from './expo-sql-driver';
 import { migrateIfNeeded } from './migrations';
+import { openSqlJsDatabase } from './sqljs-driver';
 
 /**
  * Errores de almacenamiento. Nunca degradamos SILENCIOSAMENTE a una
@@ -61,23 +62,21 @@ export async function openAppDatabase(
   databaseName: string,
   keys: EncryptionKeyProvider,
 ): Promise<OpenedDatabase> {
-  try {
-    return await openPersistentDatabase(databaseName, keys);
-  } catch (error) {
-    if (Platform.OS === 'web' && !(error instanceof DatabaseEncryptionUnavailableError)) {
-      const db = await SQLite.openDatabaseAsync(':memory:');
-      const driver: SqlDriver = new ExpoSqlDriver(db);
-      const schemaVersion = await migrateIfNeeded(driver);
-      return {
-        driver,
-        schemaVersion,
-        cipherVersion: null,
-        encrypted: false,
-        persistent: false,
-      };
-    }
-    throw error;
+  // Web: sql.js (WebAssembly sin hilos) — funciona en Safari/iOS y en hosts
+  // sin cabeceras COOP/COEP (p. ej. GitHub Pages). Persiste en localStorage.
+  if (Platform.OS === 'web') {
+    const driver = await openSqlJsDatabase();
+    const schemaVersion = await migrateIfNeeded(driver);
+    return {
+      driver,
+      schemaVersion,
+      cipherVersion: null,
+      encrypted: false,
+      persistent: true,
+    };
   }
+
+  return openPersistentDatabase(databaseName, keys);
 }
 
 async function openPersistentDatabase(

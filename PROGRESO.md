@@ -101,7 +101,7 @@ La app corre como PWA instalable sobre el mismo código Expo Router:
 
 **Límites en web (no se pierden funciones, pero cambia el soporte de plataforma):**
 - SQLite en web usa wa-sqlite **sin SQLCipher**: la PWA abre la base en modo sin cifrar (el mismo modo de aviso permanente que Expo Go). Por eso el build web fija `EXPO_PUBLIC_ALLOW_UNENCRYPTED_DB=1` y no depende del `.env` local.
-- **Safari/iOS no expone handles síncronos de OPFS**: si la base persistente no se puede abrir, la app degrada a memoria con banner permanente (los registros locales no sobreviven al cierre de la sesión; los de la cuenta se recuperan al sincronizar). Android/Chrome y Safari de escritorio mantienen la base persistente.
+- **Web usa sql.js (WebAssembly sin hilos), no expo-sqlite**: funciona en Safari/iOS y en hosts sin cabeceras COOP/COEP (p. ej. GitHub Pages), porque no requiere OPFS ni SharedArrayBuffer. La base persiste en localStorage. No hay SQLCipher en web (igual que antes).
 - La cámara (PLR/PPG) necesita **HTTPS** (o `localhost`) por `getUserMedia`; el flash/linterna solo está disponible si el navegador expone `torch` (Android Chrome normalmente sí; iOS/escritorio no).
 - Notificaciones locales (recordatorio diario) no están soportadas en web: la app lo indica con mensaje explícito, sin romperse.
 - El service worker solo existe en el build servido; en `expo start --web` (dev) no se registra.
