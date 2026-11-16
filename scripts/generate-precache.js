@@ -52,6 +52,11 @@ fs.writeFileSync(path.join(root, '_redirects'), redirects);
 // GitHub Pages no lee _redirects: usa 404.html como fallback SPA.
 fs.copyFileSync(path.join(root, 'index.html'), path.join(root, '404.html'));
 
+// GitHub Pages corre Jekyll por defecto, que ignora carpetas con "_"
+// (_expo/). El .nojekyll desactiva ese proceso y publica todo tal cual.
+fs.writeFileSync(path.join(root, '.nojekyll'), '');
+
 console.log(`[precache] ${urls.length} archivos -> ${path.join(root, 'precache-manifest.json')}`);
 console.log(`[precache] ${routes.length} rutas -> ${path.join(root, '_redirects')}`);
 console.log(`[precache] fallback SPA -> ${path.join(root, '404.html')}`);
+console.log(`[precache] .nojekyll -> ${path.join(root, '.nojekyll')}`);
